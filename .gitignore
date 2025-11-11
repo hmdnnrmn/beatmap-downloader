@@ -1,0 +1,10 @@
+# .vscode folder
+.vscode/
+# Release folder
+release/
+# Debug folder
+debug/
+# osu_beat.12345678 folder
+osu_beat.12345678/
+# text.txt file
+text.txt

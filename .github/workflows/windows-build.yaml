@@ -1,0 +1,46 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install vcpkg
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git C:/vcpkg
+        C:/vcpkg/bootstrap-vcpkg.bat
+        C:/vcpkg/vcpkg integrate install
+
+    - name: Install Detours
+      run: |
+        C:/vcpkg/vcpkg install curl:x86-windows-static
+        C:/vcpkg/vcpkg install jsoncpp:x86-windows-static
+
+    - name: Build Solution
+      run: |
+        mkdir build
+        msbuild osu_beatmap_downloader.vcxproj `
+          /p:Configuration=Release `
+          /p:Platform=Win32 `
+          /p:VcpkgRoot=C:\vcpkg 
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: OsuIngameDownloader-artifacts
+        path: |
+          **/Release/*.dll
+          **/Release/*.pdb

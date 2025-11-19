@@ -7,6 +7,9 @@
 #include "clipboard_listener.h"
 #include "download_manager.h"
 #include "logging.h"
+#include "config_manager.h"
+#include "notification_manager.h"
+#include "download_queue.h"
 
 // Global variables
 HMODULE g_hModule = NULL;
@@ -41,6 +44,9 @@ void Cleanup() {
     
     StopClipboardListener();
     UnhookShellExecute();
+    
+    DownloadQueue::Instance().Stop();
+    NotificationManager::Instance().Cleanup();
     CleanupDownloadManager();
     
     #ifdef _DEBUG
@@ -64,12 +70,23 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
             LogInfo("Console initialized successfully!");
         #endif
         
+        // Initialize Config
+        ConfigManager::Instance().LoadConfig();
+
+        // Initialize Notifications
+        if (!NotificationManager::Instance().Initialize()) {
+            std::cout << "[ERROR] Failed to initialize notification manager" << std::endl;
+        }
+
         // Initialize download manager
         if (!InitializeDownloadManager()) {
             std::cout << "[ERROR] Failed to initialize download manager" << std::endl;
             return FALSE;
         }
         
+        // Start Download Queue
+        DownloadQueue::Instance().Start();
+
         // Hook ShellExecuteExW
         if (!HookShellExecute()) {
             std::cout << "[ERROR] Failed to hook ShellExecuteExW" << std::endl;
@@ -83,6 +100,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         }
         
         std::cout << "[INFO] DLL injected successfully!" << std::endl;
+        NotificationManager::Instance().ShowNotification(L"Loaded", L"osu! Beatmap Downloader is running");
         break;
         
     case DLL_PROCESS_DETACH:

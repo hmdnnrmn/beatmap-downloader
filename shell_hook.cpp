@@ -6,9 +6,9 @@
 #include <string>
 #include <regex>
 #include <curl/curl.h>
-#include <json/json.h> // You'll need to include a JSON library like jsoncpp
+#include "download_queue.h"
 
-#pragma comment(lib, "libcurl.lib")
+// Removed pragma comment for libcurl.lib to allow project settings to control linking
 
 // Original function pointer
 typedef BOOL(WINAPI* pShellExecuteExW)(SHELLEXECUTEINFOW*);
@@ -73,24 +73,29 @@ std::wstring GetBeatmapsetId(const std::wstring& beatmapId) {
         if (response_code == 200) {
             LogDebug("API Response: " + response.data);
 
-            try {
-                // Parse JSON response
-                Json::Value root;
-                Json::Reader reader;
-                
-                if (reader.parse(response.data, root)) {
-                    if (root.isMember("beatmapset_id") && root["beatmapset_id"].isNumeric()) {
-                        int setId = root["beatmapset_id"].asInt();
+            // Simple string parsing to avoid JSON dependency
+            // Look for "beatmapset_id":12345
+            std::string searchKey = "\"beatmapset_id\":";
+            size_t pos = response.data.find(searchKey);
+            if (pos != std::string::npos) {
+                size_t start = pos + searchKey.length();
+                size_t end = response.data.find_first_of(",}", start);
+                if (end != std::string::npos) {
+                    std::string idStr = response.data.substr(start, end - start);
+                    // Trim whitespace if any
+                    idStr.erase(0, idStr.find_first_not_of(" \t\n\r"));
+                    idStr.erase(idStr.find_last_not_of(" \t\n\r") + 1);
+                    
+                    try {
+                        int setId = std::stoi(idStr);
                         beatmapsetId = std::to_wstring(setId);
                         LogDebug("Successfully converted to beatmapset ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()));
-                    } else {
-                        LogError("beatmapset_id not found in API response");
+                    } catch (...) {
+                        LogError("Failed to parse beatmapset ID from string: " + idStr);
                     }
-                } else {
-                    LogError("Failed to parse JSON response: " + reader.getFormattedErrorMessages());
                 }
-            } catch (const std::exception& e) {
-                LogError("Exception while parsing JSON: " + std::string(e.what()));
+            } else {
+                LogError("beatmapset_id not found in API response");
             }
         } else {
             LogError("API request failed with HTTP code: " + std::to_string(response_code));
@@ -161,13 +166,10 @@ BOOL WINAPI HookedShellExecuteExW(SHELLEXECUTEINFOW* pExecInfo) {
                 }
                 
                 if (!beatmapsetId.empty()) {
-                    // Download the beatmap using beatmapset ID
-                    if (DownloadBeatmap(beatmapsetId)) {
-                        LogInfo("Beatmap download initiated from osu:// link");
-                        return TRUE; // Prevent osu! client from handling
-                    } else {
-                        LogError("Failed to download beatmap from osu:// link, falling back to osu! client");
-                    }
+                    // Queue the beatmap for download
+                    DownloadQueue::Instance().Push(beatmapsetId);
+                    LogInfo("Beatmap download queued from osu:// link");
+                    return TRUE; // Prevent osu! client from handling
                 }
             }
         }
@@ -199,13 +201,10 @@ BOOL WINAPI HookedShellExecuteExW(SHELLEXECUTEINFOW* pExecInfo) {
         }
         
         if (!beatmapsetId.empty()) {
-            // Download the beatmap using beatmapset ID
-            if (DownloadBeatmap(beatmapsetId)) {
-                LogInfo("Beatmap download initiated from HTTP(S) link");
-                return TRUE; // Prevent browser from opening
-            } else {
-                LogError("Failed to download beatmap from HTTP(S) link, falling back to browser");
-            }
+            // Queue the beatmap for download
+            DownloadQueue::Instance().Push(beatmapsetId);
+            LogInfo("Beatmap download queued from HTTP(S) link");
+            return TRUE; // Prevent browser from opening
         }
     }
     

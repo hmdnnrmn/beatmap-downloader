@@ -24,23 +24,30 @@ jobs:
         C:/vcpkg/bootstrap-vcpkg.bat
         C:/vcpkg/vcpkg integrate install
 
-    - name: Install Detours
+    - name: Install Dependencies
       run: |
         C:/vcpkg/vcpkg install curl:x86-windows-static
-        C:/vcpkg/vcpkg install jsoncpp:x86-windows-static
 
-    - name: Build Solution
+    - name: Build Release
       run: |
-        mkdir build
-        msbuild osu_beatmap_downloader.vcxproj `
-          /p:Configuration=Release `
-          /p:Platform=Win32 `
-          /p:VcpkgRoot=C:\vcpkg 
+        msbuild osu_beatmap_downloader.vcxproj /p:Configuration=Release /p:Platform=Win32 /p:VcpkgRoot=C:\vcpkg
 
-    - name: Upload Artifacts
+    - name: Build Debug
+      run: |
+        msbuild osu_beatmap_downloader.vcxproj /p:Configuration=Debug /p:Platform=Win32 /p:VcpkgRoot=C:\vcpkg
+
+    - name: Upload Release Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: OsuIngameDownloader-artifacts
+        name: OsuDownloader-Release
         path: |
-          **/Release/*.dll
-          **/Release/*.pdb
+          Release/*.dll
+          Release/*.pdb
+
+    - name: Upload Debug Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: OsuDownloader-Debug
+        path: |
+          Debug/*.dll
+          Debug/*.pdb

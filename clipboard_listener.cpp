@@ -6,6 +6,7 @@
 #include <string>
 #include <regex>
 #include <thread>
+#include "download_queue.h"
 
 // Global variables for clipboard monitoring
 HWND g_hClipboardWnd = NULL;
@@ -129,8 +130,8 @@ void CheckClipboardForBeatmapLinks() {
             }
             
             if (!beatmapsetId.empty()) {
-                // Download the beatmap using beatmapset ID
-                DownloadBeatmap(beatmapsetId);
+                // Queue the beatmap for download
+                DownloadQueue::Instance().Push(beatmapsetId);
             }
             
             GlobalUnlock(hData);

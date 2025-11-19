@@ -1,5 +1,7 @@
 # .vscode folder
 .vscode/
+# .vs folder
+.vs/
 # Release folder
 release/
 # Debug folder

@@ -7,9 +7,13 @@
 #include <shlobj.h>
 #include <shellapi.h>
 #include <fstream>
+#include "config_manager.h"
+#include "notification_manager.h"
+#include <filesystem>
 
-#pragma comment(lib, "libcurl.lib")
-#pragma comment(lib, "shell32.lib")
+// Removed pragma comments to allow project settings to control linking
+
+namespace fs = std::filesystem;
 
 // Structure to hold download data
 struct DownloadData {
@@ -65,79 +69,87 @@ void CleanupDownloadManager() {
     LogInfo("Download manager cleaned up");
 }
 
+bool CheckIfMapExists(const std::wstring& beatmapId) {
+    std::wstring songsPath = ConfigManager::Instance().GetSongsPath();
+    
+    // 1. Check for .osz file
+    std::wstring oszPath = songsPath + L"\\" + beatmapId + L".osz";
+    if (GetFileAttributesW(oszPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        LogInfo("Beatmap .osz already exists: " + std::string(beatmapId.begin(), beatmapId.end()));
+        return true;
+    }
+
+    // 2. Check for imported folder (starts with ID followed by space)
+    try {
+        if (fs::exists(songsPath)) {
+            for (const auto& entry : fs::directory_iterator(songsPath)) {
+                if (entry.is_directory()) {
+                    std::wstring dirName = entry.path().filename().wstring();
+                    if (dirName.find(beatmapId + L" ") == 0) {
+                        LogInfo("Beatmap already imported: " + std::string(dirName.begin(), dirName.end()));
+                        return true;
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        LogError("Error scanning Songs directory: " + std::string(e.what()));
+    }
+
+    return false;
+}
+
 bool DownloadBeatmap(const std::wstring& beatmapId) {
     LogInfo("Starting download for beatmap ID: " + std::string(beatmapId.begin(), beatmapId.end()));
+    NotificationManager::Instance().ShowNotification(L"Downloading...", L"Beatmap ID: " + beatmapId);
 
-    // Try catboy.best first
-    std::string downloadUrl = "https://catboy.best/d/" + std::string(beatmapId.begin(), beatmapId.end());
-    LogDebug("Trying primary download URL: " + downloadUrl);
+    if (CheckIfMapExists(beatmapId)) {
+        LogInfo("Map already exists, skipping download.");
+        NotificationManager::Instance().ShowNotification(L"Skipped", L"Beatmap already exists.");
+        return true;
+    }
+
+    std::string mirror = ConfigManager::Instance().GetDownloadMirror();
+    std::string downloadUrl = mirror + std::string(beatmapId.begin(), beatmapId.end());
+    LogDebug("Trying download URL: " + downloadUrl);
 
     if (!TryDownloadFromUrl(downloadUrl, beatmapId)) {
-        // If catboy.best fails, try nerinyan.moe
-        downloadUrl = "https://api.nerinyan.moe/d/" + std::string(beatmapId.begin(), beatmapId.end());
-        LogDebug("Trying secondary download URL: " + downloadUrl);
-
-        if (!TryDownloadFromUrl(downloadUrl, beatmapId)) {
-            // If both downloads fail, open official osu! website
-            std::string osuUrl = "https://osu.ppy.sh/beatmapsets/" + std::string(beatmapId.begin(), beatmapId.end());
-            LogInfo("Opening official osu! website...");
-            ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);
-            return false;
+        // Fallback to nerinyan if primary fails
+        if (mirror.find("catboy") != std::string::npos) {
+             downloadUrl = "https://api.nerinyan.moe/d/" + std::string(beatmapId.begin(), beatmapId.end());
+             LogDebug("Trying secondary download URL: " + downloadUrl);
+             if (TryDownloadFromUrl(downloadUrl, beatmapId)) {
+                 return true;
+             }
         }
+
+        // If downloads fail, open official osu! website
+        std::string osuUrl = "https://osu.ppy.sh/beatmapsets/" + std::string(beatmapId.begin(), beatmapId.end());
+        LogInfo("Opening official osu! website...");
+        ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);
+        NotificationManager::Instance().ShowNotification(L"Failed", L"Opening browser...");
+        return false;
     }
     
     return true;
 }
 
 bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beatmapId) {
-    // Get osu! Songs folder path
-    wchar_t documentsPath[MAX_PATH];
-    if (FAILED(SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS, NULL, SHGFP_TYPE_CURRENT, documentsPath))) {
-        LogError("Failed to get Documents folder path");
-        return false;
-    }
-    
-    std::wstring osuPath = std::wstring(documentsPath) + L"\\osu!";
-    std::wstring songsPath = osuPath + L"\\Songs";
+    std::wstring songsPath = ConfigManager::Instance().GetSongsPath();
     std::wstring filename = beatmapId + L".osz";
     std::wstring fullPath = songsPath + L"\\" + filename;
 
     LogDebug("Target path: " + std::string(fullPath.begin(), fullPath.end()));
 
-    // Create osu! directory first
-    BOOL osuDirResult = CreateDirectory(osuPath.c_str(), NULL);
-    DWORD osuDirError = GetLastError();
-    if (!osuDirResult && osuDirError != ERROR_ALREADY_EXISTS) {
-        LogWarning("Could not create osu! directory. Error: " + std::to_string(osuDirError));
-        LogInfo("Attempting to create in Desktop folder instead...");
-
-        // Fallback to Desktop folder
-        wchar_t desktopPath[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_DESKTOP, NULL, SHGFP_TYPE_CURRENT, desktopPath))) {
-            songsPath = std::wstring(desktopPath);
-            fullPath = songsPath + L"\\" + filename;
-            LogInfo("Using Desktop folder: " + std::string(fullPath.begin(), fullPath.end()));
-        } else {
-            LogError("Could not find suitable download location");
-            return false;
+    // Ensure Songs directory exists
+    if (GetFileAttributesW(songsPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        // Try to create it, but it might fail if parent dirs don't exist
+        // For now, we assume the user has set a valid path in config or default exists
+        // If default fails, we might want to fallback to Desktop, but ConfigManager should handle valid paths
+        if (!CreateDirectoryW(songsPath.c_str(), NULL)) {
+             LogError("Songs directory does not exist and could not be created.");
+             return false;
         }
-    } else {
-        // Create Songs directory
-        BOOL songsDirResult = CreateDirectory(songsPath.c_str(), NULL);
-        DWORD songsDirError = GetLastError();
-        if (!songsDirResult && songsDirError != ERROR_ALREADY_EXISTS) {
-            LogError("Failed to create Songs directory. Error: " + std::to_string(songsDirError));
-            // Fallback to just the osu! directory
-            fullPath = osuPath + L"\\" + filename;
-            LogInfo("Downloading to osu! root folder: " + std::string(fullPath.begin(), fullPath.end()));
-        }
-    }
-    
-    // Check if file already exists
-    if (GetFileAttributes(fullPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        LogInfo("File already exists, skipping download");
-        ShellExecute(NULL, L"open", fullPath.c_str(), NULL, NULL, SW_HIDE);
-        return true;
     }
     
     // Initialize CURL handle
@@ -197,8 +209,12 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
             LogInfo("Successfully downloaded: " + std::string(filename.begin(), filename.end()) +
                      " (Size: " + std::to_string(static_cast<long>(downloaded)) + " bytes)");
 
-            // Open the downloaded file to import it into osu!
-            ShellExecute(NULL, L"open", fullPath.c_str(), NULL, NULL, SW_HIDE);
+            NotificationManager::Instance().ShowNotification(L"Download Complete", filename);
+
+            // Open the downloaded file to import it into osu! if enabled
+            if (ConfigManager::Instance().GetAutoOpen()) {
+                ShellExecute(NULL, L"open", fullPath.c_str(), NULL, NULL, SW_HIDE);
+            }
             curl_easy_cleanup(curl);
             return true;
         }

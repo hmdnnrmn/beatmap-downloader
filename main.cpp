@@ -3,13 +3,22 @@
 #include <iostream>
 #include <io.h>
 #include <fcntl.h>
+
 #include "shell_hook.h"
+
 #include "clipboard_listener.h"
+
 #include "download_manager.h"
+
 #include "logging.h"
+
 #include "config_manager.h"
+
 #include "notification_manager.h"
+
 #include "download_queue.h"
+#include "overlay/opengl_hook.h"
+
 
 // Global variables
 HMODULE g_hModule = NULL;
@@ -42,8 +51,12 @@ void AllocateConsole() {
 void Cleanup() {
     LogInfo("Cleaning up...");
     
-    StopClipboardListener();
-    UnhookShellExecute();
+
+        StopClipboardListener();
+
+        UnhookShellExecute();
+        OverlayGL::RemoveOpenGLHooks();
+
     
     DownloadQueue::Instance().Stop();
     NotificationManager::Instance().Cleanup();
@@ -99,7 +112,14 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
             return FALSE;
         }
         
-        std::cout << "[INFO] DLL injected successfully!" << std::endl;
+
+                // Install OpenGL overlay hook (non-fatal if it fails; osu! is 32-bit OpenGL)
+                if (!OverlayGL::InstallOpenGLHooks()) {
+                    std::cout << "[ERROR] Failed to install OpenGL overlay hooks" << std::endl;
+                }
+                
+                std::cout << "[INFO] DLL injected successfully!" << std::endl;
+
         NotificationManager::Instance().ShowNotification(L"Loaded", L"osu! Beatmap Downloader is running");
         break;
         

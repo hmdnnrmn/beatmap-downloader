@@ -10,15 +10,36 @@
 #include "config_manager.h"
 #include "notification_manager.h"
 #include <filesystem>
+#include <mutex>
 
 // Removed pragma comments to allow project settings to control linking
 
 namespace fs = std::filesystem;
 
+// Global state
+static DownloadState g_DownloadState;
+static std::mutex g_StateMutex;
+
+DownloadState GetDownloadState() {
+    std::lock_guard<std::mutex> lock(g_StateMutex);
+    return g_DownloadState;
+}
+
+static void UpdateDownloadState(const std::wstring& id, const std::wstring& name, int prog, size_t dl, size_t total, bool active) {
+    std::lock_guard<std::mutex> lock(g_StateMutex);
+    g_DownloadState.beatmapId = id;
+    g_DownloadState.filename = name;
+    g_DownloadState.progress = prog;
+    g_DownloadState.downloadedBytes = dl;
+    g_DownloadState.totalBytes = total;
+    g_DownloadState.isDownloading = active;
+}
+
 // Structure to hold download data
 struct DownloadData {
     std::ofstream* file;
     std::wstring filename;
+    std::wstring beatmapId;
     size_t totalSize;
     size_t downloadedSize;
 };
@@ -29,9 +50,9 @@ int ProgressCallback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_o
     
     if (dltotal > 0) {
         int progress = static_cast<int>((dlnow * 100) / dltotal);
-        std::wcout << L"\r[DOWNLOAD] " << data->filename << L" - " << progress << L"% (" 
-                   << dlnow << L"/" << dltotal << L" bytes)";
-        std::wcout.flush();
+        
+        // Update global state
+        UpdateDownloadState(data->beatmapId, data->filename, progress, (size_t)dlnow, (size_t)dltotal, true);
     }
     
     return 0; // Return 0 to continue download
@@ -101,11 +122,13 @@ bool CheckIfMapExists(const std::wstring& beatmapId) {
 
 bool DownloadBeatmap(const std::wstring& beatmapId) {
     LogInfo("Starting download for beatmap ID: " + std::string(beatmapId.begin(), beatmapId.end()));
-    NotificationManager::Instance().ShowNotification(L"Downloading...", L"Beatmap ID: " + beatmapId);
-
+    
+    // Reset state
+    UpdateDownloadState(beatmapId, L"Initializing...", 0, 0, 0, true);
+    
     if (CheckIfMapExists(beatmapId)) {
         LogInfo("Map already exists, skipping download.");
-        NotificationManager::Instance().ShowNotification(L"Skipped", L"Beatmap already exists.");
+        UpdateDownloadState(beatmapId, L"Skipped (Exists)", 100, 0, 0, false);
         return true;
     }
 
@@ -127,7 +150,8 @@ bool DownloadBeatmap(const std::wstring& beatmapId) {
         std::string osuUrl = "https://osu.ppy.sh/beatmapsets/" + std::string(beatmapId.begin(), beatmapId.end());
         LogInfo("Opening official osu! website...");
         ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);
-        NotificationManager::Instance().ShowNotification(L"Failed", L"Opening browser...");
+        
+        UpdateDownloadState(beatmapId, L"Failed (Browser Opened)", 0, 0, 0, false);
         return false;
     }
     
@@ -143,11 +167,9 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
 
     // Ensure Songs directory exists
     if (GetFileAttributesW(songsPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        // Try to create it, but it might fail if parent dirs don't exist
-        // For now, we assume the user has set a valid path in config or default exists
-        // If default fails, we might want to fallback to Desktop, but ConfigManager should handle valid paths
         if (!CreateDirectoryW(songsPath.c_str(), NULL)) {
              LogError("Songs directory does not exist and could not be created.");
+             UpdateDownloadState(beatmapId, L"Error: No Songs Dir", 0, 0, 0, false);
              return false;
         }
     }
@@ -171,6 +193,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     DownloadData downloadData;
     downloadData.file = &outFile;
     downloadData.filename = filename;
+    downloadData.beatmapId = beatmapId;
     downloadData.totalSize = 0;
     downloadData.downloadedSize = 0;
     
@@ -178,8 +201,8 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     curl_easy_setopt(curl, CURLOPT_URL, downloadUrl.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &downloadData);
-    curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, ProgressCallback);
-    curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, &downloadData);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, ProgressCallback);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &downloadData);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "osu! Beatmap Downloader/1.0");
@@ -209,7 +232,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
             LogInfo("Successfully downloaded: " + std::string(filename.begin(), filename.end()) +
                      " (Size: " + std::to_string(static_cast<long>(downloaded)) + " bytes)");
 
-            NotificationManager::Instance().ShowNotification(L"Download Complete", filename);
+            UpdateDownloadState(beatmapId, L"Complete", 100, (size_t)downloaded, (size_t)downloaded, false);
 
             // Open the downloaded file to import it into osu! if enabled
             if (ConfigManager::Instance().GetAutoOpen()) {
@@ -227,6 +250,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
         DeleteFile(fullPath.c_str());
     }
     
+    UpdateDownloadState(beatmapId, L"Failed", 0, 0, 0, false);
     curl_easy_cleanup(curl);
     return false;
 }

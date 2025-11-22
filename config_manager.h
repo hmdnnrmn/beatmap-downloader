@@ -14,6 +14,8 @@ public:
     bool GetAutoOpen() const;
 
     void SetSongsPath(const std::wstring& path);
+    void SetDownloadMirror(const std::string& mirror);
+    void SetAutoOpen(bool autoOpen);
 
 private:
     ConfigManager();

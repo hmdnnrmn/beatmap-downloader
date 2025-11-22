@@ -94,3 +94,13 @@ void ConfigManager::SetSongsPath(const std::wstring& path) {
     m_songsPath = path;
     SaveConfig();
 }
+
+void ConfigManager::SetDownloadMirror(const std::string& mirror) {
+    m_downloadMirror = mirror;
+    SaveConfig();
+}
+
+void ConfigManager::SetAutoOpen(bool autoOpen) {
+    m_autoOpen = autoOpen;
+    SaveConfig();
+}

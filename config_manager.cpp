@@ -9,14 +9,13 @@ ConfigManager& ConfigManager::Instance() {
     return instance;
 }
 
-ConfigManager::ConfigManager() : m_autoOpen(true) {
+ConfigManager::ConfigManager() : m_autoOpen(true), m_mirrorIndex(0), m_clipboardEnabled(true) {
     // Set config path to be next to the DLL
     wchar_t dllPath[MAX_PATH];
     GetModuleFileNameW(GetModuleHandle(NULL), dllPath, MAX_PATH);
     std::wstring path(dllPath);
     m_configPath = path.substr(0, path.find_last_of(L"\\/")) + L"\\config.ini";
     
-    m_downloadMirror = "https://catboy.best/d/";
     m_songsPath = GetDefaultSongsPath();
 }
 
@@ -55,13 +54,14 @@ bool ConfigManager::LoadConfig() {
     GetPrivateProfileStringW(L"General", L"SongsPath", m_songsPath.c_str(), buffer, MAX_PATH, m_configPath.c_str());
     m_songsPath = buffer;
 
-    // Load Mirror
-    GetPrivateProfileStringW(L"General", L"Mirror", L"https://catboy.best/d/", buffer, MAX_PATH, m_configPath.c_str());
-    std::wstring mirrorW(buffer);
-    m_downloadMirror = std::string(mirrorW.begin(), mirrorW.end());
+    // Load Mirror Index
+    m_mirrorIndex = GetPrivateProfileIntW(L"General", L"MirrorIndex", 0, m_configPath.c_str());
 
     // Load AutoOpen
     m_autoOpen = GetPrivateProfileIntW(L"General", L"AutoOpen", 1, m_configPath.c_str()) != 0;
+
+    // Load Clipboard Enabled
+    m_clipboardEnabled = GetPrivateProfileIntW(L"General", L"ClipboardEnabled", 1, m_configPath.c_str()) != 0;
 
     LogInfo("Config loaded. Songs Path: " + std::string(m_songsPath.begin(), m_songsPath.end()));
     return true;
@@ -70,10 +70,11 @@ bool ConfigManager::LoadConfig() {
 void ConfigManager::SaveConfig() {
     WritePrivateProfileStringW(L"General", L"SongsPath", m_songsPath.c_str(), m_configPath.c_str());
     
-    std::wstring mirrorW(m_downloadMirror.begin(), m_downloadMirror.end());
-    WritePrivateProfileStringW(L"General", L"Mirror", mirrorW.c_str(), m_configPath.c_str());
+    WritePrivateProfileStringW(L"General", L"MirrorIndex", std::to_wstring(m_mirrorIndex).c_str(), m_configPath.c_str());
     
     WritePrivateProfileStringW(L"General", L"AutoOpen", m_autoOpen ? L"1" : L"0", m_configPath.c_str());
+
+    WritePrivateProfileStringW(L"General", L"ClipboardEnabled", m_clipboardEnabled ? L"1" : L"0", m_configPath.c_str());
     
     LogInfo("Config saved");
 }
@@ -82,12 +83,16 @@ std::wstring ConfigManager::GetSongsPath() const {
     return m_songsPath;
 }
 
-std::string ConfigManager::GetDownloadMirror() const {
-    return m_downloadMirror;
+int ConfigManager::GetDownloadMirrorIndex() const {
+    return m_mirrorIndex;
 }
 
 bool ConfigManager::GetAutoOpen() const {
     return m_autoOpen;
+}
+
+bool ConfigManager::IsClipboardEnabled() const {
+    return m_clipboardEnabled;
 }
 
 void ConfigManager::SetSongsPath(const std::wstring& path) {
@@ -95,12 +100,17 @@ void ConfigManager::SetSongsPath(const std::wstring& path) {
     SaveConfig();
 }
 
-void ConfigManager::SetDownloadMirror(const std::string& mirror) {
-    m_downloadMirror = mirror;
+void ConfigManager::SetDownloadMirrorIndex(int index) {
+    m_mirrorIndex = index;
     SaveConfig();
 }
 
 void ConfigManager::SetAutoOpen(bool autoOpen) {
     m_autoOpen = autoOpen;
+    SaveConfig();
+}
+
+void ConfigManager::SetClipboardEnabled(bool enabled) {
+    m_clipboardEnabled = enabled;
     SaveConfig();
 }

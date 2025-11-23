@@ -29,31 +29,31 @@ void DownloadQueue::Stop() {
     LogInfo("Download queue worker stopped");
 }
 
-void DownloadQueue::Push(const std::wstring& beatmapId) {
+
+
+void DownloadQueue::Push(const std::wstring& id, bool isBeatmapId) {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_queue.push(beatmapId);
+        m_queue.push({id, isBeatmapId});
     }
-    LogInfo("Added beatmap to download queue: " + std::string(beatmapId.begin(), beatmapId.end()));
-    NotificationManager::Instance().ShowNotification(L"Download Queued", L"Beatmap added to queue");
     m_cv.notify_one();
 }
 
 void DownloadQueue::WorkerThread() {
     while (m_running) {
-        std::wstring beatmapId;
+        QueueItem item;
         {
             std::unique_lock<std::mutex> lock(m_mutex);
             m_cv.wait(lock, [this] { return !m_queue.empty() || !m_running; });
 
-            if (!m_running && m_queue.empty()) break;
+            if (!m_running && m_queue.empty()) {
+                break;
+            }
 
-            beatmapId = m_queue.front();
+            item = m_queue.front();
             m_queue.pop();
         }
 
-        if (!beatmapId.empty()) {
-            DownloadBeatmap(beatmapId);
-        }
+        DownloadBeatmap(item.id, item.isBeatmapId);
     }
 }

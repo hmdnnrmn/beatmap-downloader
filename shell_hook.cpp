@@ -2,13 +2,11 @@
 #include "shell_hook.h"
 #include "download_manager.h"
 #include "logging.h"
+#include "network/HttpRequest.h"
 #include <iostream>
 #include <string>
 #include <regex>
-#include <curl/curl.h>
 #include "download_queue.h"
-
-// Removed pragma comment for libcurl.lib to allow project settings to control linking
 
 // Original function pointer
 typedef BOOL(WINAPI* pShellExecuteExW)(SHELLEXECUTEINFOW*);
@@ -18,95 +16,6 @@ pShellExecuteExW OriginalShellExecuteExW = nullptr;
 BYTE originalBytes[12];
 BYTE hookBytes[12];
 bool isHooked = false;
-
-// Structure to hold API response data
-struct APIResponseData {
-    std::string data;
-};
-
-// Callback function to write API response data
-size_t WriteAPICallback(void* contents, size_t size, size_t nmemb, APIResponseData* response) {
-    size_t totalSize = size * nmemb;
-    response->data.append(static_cast<char*>(contents), totalSize);
-    return totalSize;
-}
-
-// Function to get beatmapset ID from beatmap ID
-std::wstring GetBeatmapsetId(const std::wstring& beatmapId) {
-    LogDebug("[API] Converting beatmap ID " + std::string(beatmapId.begin(), beatmapId.end()) + " to beatmapset ID...");
-
-    // Convert wstring to string for libcurl
-    std::string apiUrl = "https://catboy.best/api/v2/b/" + std::string(beatmapId.begin(), beatmapId.end());
-    LogDebug("API URL: " + apiUrl);
-
-    // Initialize CURL handle
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        LogError("Failed to initialize CURL handle for API request");
-        return L"";
-    }
-    
-    // Setup response data structure
-    APIResponseData response;
-    
-    // Configure CURL options
-    curl_easy_setopt(curl, CURLOPT_URL, apiUrl.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteAPICallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "osu! Beatmap Downloader/1.0");
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L); // 30 seconds timeout
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L); // 10 seconds connection timeout
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-    
-    // Perform the API request
-    CURLcode res = curl_easy_perform(curl);
-    
-    std::wstring beatmapsetId;
-    
-    if (res == CURLE_OK) {
-        // Get response code
-        long response_code;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-        
-        if (response_code == 200) {
-            LogDebug("API Response: " + response.data);
-
-            // Simple string parsing to avoid JSON dependency
-            // Look for "beatmapset_id":12345
-            std::string searchKey = "\"beatmapset_id\":";
-            size_t pos = response.data.find(searchKey);
-            if (pos != std::string::npos) {
-                size_t start = pos + searchKey.length();
-                size_t end = response.data.find_first_of(",}", start);
-                if (end != std::string::npos) {
-                    std::string idStr = response.data.substr(start, end - start);
-                    // Trim whitespace if any
-                    idStr.erase(0, idStr.find_first_not_of(" \t\n\r"));
-                    idStr.erase(idStr.find_last_not_of(" \t\n\r") + 1);
-                    
-                    try {
-                        int setId = std::stoi(idStr);
-                        beatmapsetId = std::to_wstring(setId);
-                        LogDebug("Successfully converted to beatmapset ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()));
-                    } catch (...) {
-                        LogError("Failed to parse beatmapset ID from string: " + idStr);
-                    }
-                }
-            } else {
-                LogError("beatmapset_id not found in API response");
-            }
-        } else {
-            LogError("API request failed with HTTP code: " + std::to_string(response_code));
-        }
-    } else {
-        LogError("libcurl API request error: " + std::string(curl_easy_strerror(res)));
-    }
-    
-    curl_easy_cleanup(curl);
-    return beatmapsetId;
-}
 
 // Helper function to convert wide string to narrow string
 std::string WideToNarrow(const wchar_t* str) {
@@ -149,28 +58,23 @@ BOOL WINAPI HookedShellExecuteExW(SHELLEXECUTEINFOW* pExecInfo) {
                 std::wstring extractedId = matches[1].str();
                 LogInfo("Extracted ID from osu:// link: " + std::string(extractedId.begin(), extractedId.end()));
 
-                std::wstring beatmapsetId;
+                bool isBeatmapId = false;
                 
                 // Check if it's a beatmapset link (osu://dl/ or osu://s/)
                 if (url.find(L"osu://dl/") != std::wstring::npos || url.find(L"osu://s/") != std::wstring::npos) {
                     // It's already a beatmapset ID
-                    beatmapsetId = extractedId;
-                    LogInfo("Using beatmapset ID directly: " + std::string(beatmapsetId.begin(), beatmapsetId.end()));
+                    isBeatmapId = false;
+                    LogInfo("Detected beatmapset ID: " + std::string(extractedId.begin(), extractedId.end()));
                 } else {
-                    // It's a beatmap ID (osu://b/), convert to beatmapset ID
-                    beatmapsetId = GetBeatmapsetId(extractedId);
-                    if (beatmapsetId.empty()) {
-                        LogError("Failed to convert beatmap ID to beatmapset ID, falling back to osu! client");
-                        // Don't return here, let it fall through to original function
-                    }
+                    // It's a beatmap ID (osu://b/)
+                    isBeatmapId = true;
+                    LogInfo("Detected beatmap ID: " + std::string(extractedId.begin(), extractedId.end()));
                 }
                 
-                if (!beatmapsetId.empty()) {
-                    // Queue the beatmap for download
-                    DownloadQueue::Instance().Push(beatmapsetId);
-                    LogInfo("Beatmap download queued from osu:// link");
-                    return TRUE; // Prevent osu! client from handling
-                }
+                // Queue the beatmap for download
+                DownloadQueue::Instance().Push(extractedId, isBeatmapId);
+                LogInfo("Beatmap download queued from osu:// link");
+                return TRUE; // Prevent osu! client from handling
             }
         }
         
@@ -180,31 +84,19 @@ BOOL WINAPI HookedShellExecuteExW(SHELLEXECUTEINFOW* pExecInfo) {
         std::wregex beatmapRegex(L"(?:https?://)?osu\\.ppy\\.sh/(?:beatmaps|b)/(\\d+)");
         std::wsmatch matches;
         
-        std::wstring beatmapsetId;
-        
         // Check for beatmapset links first
         if (std::regex_search(url, matches, beatmapsetRegex)) {
-            beatmapsetId = matches[1].str();
-            LogInfo("[INFO] Intercepted HTTP(S) beatmapset link, ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()));
+            std::wstring id = matches[1].str();
+            LogInfo("[INFO] Intercepted HTTP(S) beatmapset link, ID: " + std::string(id.begin(), id.end()));
+            DownloadQueue::Instance().Push(id, false);
+            return TRUE;
         }
         // Check for individual beatmap links
         else if (std::regex_search(url, matches, beatmapRegex)) {
-            std::wstring beatmapId = matches[1].str();
-            LogInfo("[INFO] Intercepted HTTP(S) beatmap link, ID: " + std::string(beatmapId.begin(), beatmapId.end()));
-
-            // Convert beatmap ID to beatmapset ID
-            beatmapsetId = GetBeatmapsetId(beatmapId);
-            if (beatmapsetId.empty()) {
-                LogError("Failed to convert beatmap ID to beatmapset ID, falling back to browser");
-                // Don't return here, let it fall through to original function
-            }
-        }
-        
-        if (!beatmapsetId.empty()) {
-            // Queue the beatmap for download
-            DownloadQueue::Instance().Push(beatmapsetId);
-            LogInfo("Beatmap download queued from HTTP(S) link");
-            return TRUE; // Prevent browser from opening
+            std::wstring id = matches[1].str();
+            LogInfo("[INFO] Intercepted HTTP(S) beatmap link, ID: " + std::string(id.begin(), id.end()));
+            DownloadQueue::Instance().Push(id, true);
+            return TRUE;
         }
     }
     

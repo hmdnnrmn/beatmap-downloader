@@ -1,21 +1,59 @@
-// clipboard_listener.cpp
 #include "clipboard_listener.h"
 #include "download_manager.h"
 #include "logging.h"
-#include <iostream>
-#include <string>
-#include <regex>
+#include "config_manager.h"
 #include <thread>
-#include "download_queue.h"
+#include <atomic>
+#include <regex>
+#include <string>
+#include <iostream>
 
-// Global variables for clipboard monitoring
-HWND g_hClipboardWnd = NULL;
-HWND g_hNextClipboardViewer = NULL;
-bool g_bClipboardListening = false;
-std::thread g_clipboardThread;
-std::wstring GetBeatmapsetId(const std::wstring& beatmapId);
+// Globals
+static HWND g_hClipboardWnd = NULL;
+static HWND g_hNextClipboardViewer = NULL;
+static std::atomic<bool> g_bClipboardListening(false);
+static std::thread g_clipboardThread;
 
-// Window procedure for clipboard monitoring
+void CheckClipboardForBeatmapLinks() {
+    if (!ConfigManager::Instance().IsClipboardEnabled()) {
+        return;
+    }
+
+    if (!OpenClipboard(NULL)) {
+        return;
+    }
+    
+    HANDLE hData = GetClipboardData(CF_UNICODETEXT);
+    if (hData != NULL) {
+        wchar_t* pszText = static_cast<wchar_t*>(GlobalLock(hData));
+        if (pszText != NULL) {
+            std::wstring clipboardText(pszText);
+            
+            // Check for osu! beatmapset link first
+            std::wregex beatmapsetRegex(L"https://osu\\.ppy\\.sh/beatmapsets/(\\d+)");
+            std::wsmatch matches;
+            
+            if (std::regex_search(clipboardText, matches, beatmapsetRegex)) {
+                std::wstring id = matches[1].str();
+                LogInfo("Beatmapset link detected in clipboard, ID: " + std::string(id.begin(), id.end()));
+                DownloadBeatmap(id, false); // false = beatmapset ID
+            } else {
+                // Check for individual beatmap link
+                std::wregex beatmapRegex(L"https://osu\\.ppy\\.sh/beatmaps/(\\d+)");
+                if (std::regex_search(clipboardText, matches, beatmapRegex)) {
+                    std::wstring id = matches[1].str();
+                    LogInfo("Beatmap link detected in clipboard, ID: " + std::string(id.begin(), id.end()));
+                    DownloadBeatmap(id, true); // true = beatmap ID
+                }
+            }
+            
+            GlobalUnlock(hData);
+        }
+    }
+    
+    CloseClipboard();
+}
+
 LRESULT CALLBACK ClipboardWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DRAWCLIPBOARD:
@@ -86,65 +124,15 @@ void ClipboardMonitorThread() {
     if (g_hClipboardWnd) {
         ChangeClipboardChain(g_hClipboardWnd, g_hNextClipboardViewer);
         DestroyWindow(g_hClipboardWnd);
-    }
-
-    LogInfo("Clipboard listener stopped");
-}
-
-void CheckClipboardForBeatmapLinks() {
-    if (!OpenClipboard(NULL)) {
-        return;
+        g_hClipboardWnd = NULL;
     }
     
-    HANDLE hData = GetClipboardData(CF_UNICODETEXT);
-    if (hData != NULL) {
-        wchar_t* pszText = static_cast<wchar_t*>(GlobalLock(hData));
-        if (pszText != NULL) {
-            std::wstring clipboardText(pszText);
-            
-            std::wstring beatmapsetId;
-            
-            // Check for osu! beatmapset link first
-            std::wregex beatmapsetRegex(L"https://osu\\.ppy\\.sh/beatmapsets/(\\d+)");
-            std::wsmatch matches;
-            
-            if (std::regex_search(clipboardText, matches, beatmapsetRegex)) {
-                beatmapsetId = matches[1].str();
-                LogInfo("Beatmapset link detected in clipboard, ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()));
-            } else {
-                // Check for individual beatmap link
-                std::wregex beatmapRegex(L"https://osu\\.ppy\\.sh/beatmaps/(\\d+)");
-                if (std::regex_search(clipboardText, matches, beatmapRegex)) {
-                    std::wstring beatmapId = matches[1].str();
-                    LogInfo("Beatmap link detected in clipboard, ID: " + std::string(beatmapId.begin(), beatmapId.end()));
-
-                    // Convert beatmap ID to beatmapset ID
-                    beatmapsetId = GetBeatmapsetId(beatmapId);
-                    if (beatmapsetId.empty()) {
-                        LogError("Failed to convert beatmap ID to beatmapset ID from clipboard");
-                        GlobalUnlock(hData);
-                        CloseClipboard();
-                        return;
-                    }
-                }
-            }
-            
-            if (!beatmapsetId.empty()) {
-                // Queue the beatmap for download
-                DownloadQueue::Instance().Push(beatmapsetId);
-            }
-            
-            GlobalUnlock(hData);
-        }
-    }
-    
-    CloseClipboard();
+    UnregisterClass(L"OsuBeatmapClipboardListener", GetModuleHandle(NULL));
+    LogInfo("Clipboard listener thread stopped");
 }
 
 bool StartClipboardListener() {
-    if (g_bClipboardListening) {
-        return true; // Already listening
-    }
+    if (g_bClipboardListening) return true;
     
     g_bClipboardListening = true;
     g_clipboardThread = std::thread(ClipboardMonitorThread);

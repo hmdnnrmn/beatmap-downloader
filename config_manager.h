@@ -10,12 +10,15 @@ public:
     void SaveConfig();
 
     std::wstring GetSongsPath() const;
-    std::string GetDownloadMirror() const;
+
+    int GetDownloadMirrorIndex() const;
     bool GetAutoOpen() const;
+    bool IsClipboardEnabled() const;
 
     void SetSongsPath(const std::wstring& path);
-    void SetDownloadMirror(const std::string& mirror);
+    void SetDownloadMirrorIndex(int index);
     void SetAutoOpen(bool autoOpen);
+    void SetClipboardEnabled(bool enabled);
 
 private:
     ConfigManager();
@@ -25,8 +28,9 @@ private:
 
     std::wstring m_configPath;
     std::wstring m_songsPath;
-    std::string m_downloadMirror;
+    int m_mirrorIndex;
     bool m_autoOpen;
+    bool m_clipboardEnabled;
 
     std::wstring GetDefaultSongsPath();
 };

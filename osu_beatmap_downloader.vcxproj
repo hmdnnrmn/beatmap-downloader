@@ -105,6 +105,7 @@
     <ClCompile Include="config_manager.cpp" />
     <ClCompile Include="notification_manager.cpp" />
     <ClCompile Include="download_queue.cpp" />
+    <ClCompile Include="network\HttpRequest.cpp" />
     <ClCompile Include="overlay\opengl_hook.cpp" />
     <ClCompile Include="overlay\imgui\imgui.cpp" />
     <ClCompile Include="overlay\imgui\imgui_draw.cpp" />
@@ -122,6 +123,7 @@
     <ClInclude Include="config_manager.h" />
     <ClInclude Include="notification_manager.h" />
     <ClInclude Include="download_queue.h" />
+    <ClInclude Include="network\HttpRequest.h" />
     <ClInclude Include="overlay\opengl_hook.h" />
   </ItemGroup>
 

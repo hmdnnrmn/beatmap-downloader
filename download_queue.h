@@ -12,7 +12,7 @@ public:
 
     void Start();
     void Stop();
-    void Push(const std::wstring& beatmapId);
+    void Push(const std::wstring& id, bool isBeatmapId);
 
 private:
     DownloadQueue() = default;
@@ -22,7 +22,12 @@ private:
 
     void WorkerThread();
 
-    std::queue<std::wstring> m_queue;
+    struct QueueItem {
+        std::wstring id;
+        bool isBeatmapId;
+    };
+
+    std::queue<QueueItem> m_queue;
     std::mutex m_mutex;
     std::condition_variable m_cv;
     std::thread m_thread;

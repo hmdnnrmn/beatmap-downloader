@@ -130,8 +130,9 @@ namespace OverlayGL {
 
                     if (ImGui::BeginTabItem("Settings")) {
                         static char songsPath[256] = "";
-                        static char mirrorUrl[256] = "";
+                        static int mirrorIndex = 0;
                         static bool autoOpen = false;
+                        static bool clipboardEnabled = true;
                         static bool initSettings = false;
 
                         if (!initSettings) {
@@ -139,8 +140,9 @@ namespace OverlayGL {
                             std::string sPath(wPath.begin(), wPath.end());
                             strcpy_s(songsPath, sPath.c_str());
                             
-                            strcpy_s(mirrorUrl, ConfigManager::Instance().GetDownloadMirror().c_str());
+                            mirrorIndex = ConfigManager::Instance().GetDownloadMirrorIndex();
                             autoOpen = ConfigManager::Instance().GetAutoOpen();
+                            clipboardEnabled = ConfigManager::Instance().IsClipboardEnabled();
                             initSettings = true;
                         }
 
@@ -149,11 +151,18 @@ namespace OverlayGL {
                             std::wstring wPath(sPath.begin(), sPath.end());
                             ConfigManager::Instance().SetSongsPath(wPath);
                         }
-                        if (ImGui::InputText("Mirror URL", mirrorUrl, IM_ARRAYSIZE(mirrorUrl))) {
-                            ConfigManager::Instance().SetDownloadMirror(mirrorUrl);
+                        
+                        const char* mirrors[] = { "Catboy.best", "Nerinyan.moe" };
+                        if (ImGui::Combo("Mirror", &mirrorIndex, mirrors, IM_ARRAYSIZE(mirrors))) {
+                            ConfigManager::Instance().SetDownloadMirrorIndex(mirrorIndex);
                         }
+
                         if (ImGui::Checkbox("Auto Open (.osz)", &autoOpen)) {
                             ConfigManager::Instance().SetAutoOpen(autoOpen);
+                        }
+
+                        if (ImGui::Checkbox("Enable Clipboard Listener", &clipboardEnabled)) {
+                            ConfigManager::Instance().SetClipboardEnabled(clipboardEnabled);
                         }
 
                         ImGui::EndTabItem();

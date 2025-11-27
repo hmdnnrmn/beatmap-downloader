@@ -113,6 +113,13 @@
     <ClCompile Include="overlay\imgui\imgui_widgets.cpp" />
     <ClCompile Include="overlay\imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="overlay\imgui\backends\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="providers\Catboy.cpp" />
+    <ClCompile Include="providers\Nerinyan.cpp" />
+    <ClCompile Include="providers\ProviderRegistry.cpp" />
+    <ClCompile Include="providers\Sayobot.cpp" />
+    <ClCompile Include="providers\OsuDirect.cpp" />
+    <ClCompile Include="providers\Beatconnect.cpp" />
+    <ClCompile Include="providers\Resolver.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -125,6 +132,14 @@
     <ClInclude Include="download_queue.h" />
     <ClInclude Include="network\HttpRequest.h" />
     <ClInclude Include="overlay\opengl_hook.h" />
+    <ClInclude Include="providers\Provider.h" />
+    <ClInclude Include="providers\Catboy.h" />
+    <ClInclude Include="providers\Nerinyan.h" />
+    <ClInclude Include="providers\ProviderRegistry.h" />
+    <ClInclude Include="providers\Sayobot.h" />
+    <ClInclude Include="providers\OsuDirect.h" />
+    <ClInclude Include="providers\Beatconnect.h" />
+    <ClInclude Include="providers\Resolver.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

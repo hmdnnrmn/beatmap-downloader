@@ -9,6 +9,8 @@
 #include "notification_manager.h"
 #include <filesystem>
 #include <mutex>
+#include <memory>
+#include "providers/ProviderRegistry.h"
 
 namespace fs = std::filesystem;
 
@@ -117,104 +119,39 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     }
 }
 
-// Helper function to resolve beatmapset ID based on mirror and ID type
-std::wstring ResolveBeatmapSetId(const std::wstring& id, bool isBeatmapId, int mirrorIndex) {
-    std::string idStr(id.begin(), id.end());
-    
-    // Catboy.best (Index 0)
-    if (mirrorIndex == 0) {
-        // Catboy handles both /b/ and /s/ via API, but for direct download /d/ usually expects SetID.
-        // However, user requested:
-        // if osu.ppy.sh/b/xxx -> https://catboy.best/api/v2/b/{id} (Direct Download)
-        // if osu.ppy.sh/s/xxx -> https://catboy.best/api/v2/s/{id} (Direct Download)
-        // We will return the FULL URL here because the structure is different.
-        // But DownloadBeatmap expects an ID to check for existence.
-        // So we will return the ID here, and handle URL construction in DownloadBeatmap.
-        return id; 
-    }
-    
-    // Nerinyan.moe (Index 1)
-    if (mirrorIndex == 1) {
-        if (isBeatmapId) {
-            // Nerinyan needs SetID. We resolve it by checking osu! redirect.
-            std::string osuUrl = "https://osu.ppy.sh/b/" + idStr;
-            std::string redirectUrl;
-            std::string error;
-            
-            LogInfo("Resolving BeatmapSet ID for Nerinyan from: " + osuUrl);
-            
-            if (network::HttpRequest::GetRedirectUrl(osuUrl, redirectUrl, &error)) {
-                // Expected format: https://osu.ppy.sh/beatmapsets/547857#osu/1160293
-                // We need to extract 547857
-                std::string searchKey = "/beatmapsets/";
-                size_t pos = redirectUrl.find(searchKey);
-                if (pos != std::string::npos) {
-                    size_t start = pos + searchKey.length();
-                    size_t end = redirectUrl.find_first_of("#/?", start);
-                    if (end == std::string::npos) end = redirectUrl.length();
-                    
-                    std::string setIdStr = redirectUrl.substr(start, end - start);
-                    LogInfo("Resolved BeatmapSet ID: " + setIdStr);
-                    return std::wstring(setIdStr.begin(), setIdStr.end());
-                }
-            } else {
-                LogError("Failed to resolve redirect: " + error);
-            }
-            return L""; // Failed
-        }
-        // If it's already a SetID (from /s/ link), Nerinyan handles it directly
-        return id;
-    }
-
-    return id;
-}
-
 bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
     int mirrorIndex = ConfigManager::Instance().GetDownloadMirrorIndex();
-    std::wstring beatmapsetId = ResolveBeatmapSetId(id, isBeatmapId, mirrorIndex);
+    std::unique_ptr<Provider> provider = ProviderRegistry::Instance().CreateProvider(mirrorIndex);
+
+    if (!provider) {
+        LogError("Invalid provider index: " + std::to_string(mirrorIndex));
+        UpdateDownloadState(id, L"Failed (Invalid Provider)", 0, 0, 0, false);
+        return false;
+    }
+
+    std::wstring beatmapsetId = provider->ResolveBeatmapSetId(id, isBeatmapId);
 
     if (beatmapsetId.empty()) {
-        LogError("Failed to resolve BeatmapSet ID.");
+        LogError("Failed to resolve BeatmapSet ID using provider: " + provider->GetName());
         UpdateDownloadState(id, L"Failed (ID Resolution)", 0, 0, 0, false);
         return false;
     }
 
-    LogInfo("Starting download for ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()));
+    LogInfo("Starting download for ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()) + " using " + provider->GetName());
     
     // Reset state
     UpdateDownloadState(beatmapsetId, L"Initializing...", 0, 0, 0, true);
     
-    // Check existence (only works if we have a SetID, for Catboy /b/ links we might be checking BeatmapID against SetID folders which won't match, but that's acceptable behavior for now or we assume user knows what they are doing)
-    // Actually, if Catboy /b/ is used, beatmapsetId is the BeatmapID. CheckIfMapExists checks for "ID ". 
-    // If we have BeatmapID 123, and folder is "456 Artist - Title", it won't match.
-    // But we can't easily get SetID from Catboy without an extra API call which user seemed to want to avoid/simplify.
-    // We will proceed with download.
     if (CheckIfMapExists(beatmapsetId)) {
         LogInfo("Map already exists, skipping download.");
         UpdateDownloadState(beatmapsetId, L"Skipped (Exists)", 100, 0, 0, false);
         return true;
     }
 
-    std::string downloadUrl;
-    std::string idStr(beatmapsetId.begin(), beatmapsetId.end());
-
-    if (mirrorIndex == 0) { // Catboy
-        if (isBeatmapId) {
-            downloadUrl = "https://catboy.best/api/v2/b/" + idStr;
-        } else {
-            downloadUrl = "https://catboy.best/api/v2/s/" + idStr;
-        }
-    } else { // Nerinyan
-        downloadUrl = "https://api.nerinyan.moe/d/" + idStr;
-    }
-
+    std::string downloadUrl = provider->GetDownloadUrl(beatmapsetId, isBeatmapId);
     LogDebug("Download URL: " + downloadUrl);
 
     if (!TryDownloadFromUrl(downloadUrl, beatmapsetId)) {
-        // Fallback or Error
-        // If Nerinyan fails, we could try Catboy? But user wanted specific behavior.
-        // We will just open browser on failure.
-
         std::string osuUrl = "https://osu.ppy.sh/b/" + std::string(id.begin(), id.end());
         LogInfo("Opening official osu! website...");
         ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);

@@ -11,6 +11,7 @@
 #include "input_hook.h"
 #include "../download_manager.h"
 #include "../config_manager.h"
+#include "../providers/ProviderRegistry.h"
 
 static HGLRC        g_LastGLRC         = nullptr;
 static HWND         g_TargetHwnd       = nullptr;
@@ -152,8 +153,13 @@ namespace OverlayGL {
                             ConfigManager::Instance().SetSongsPath(wPath);
                         }
                         
-                        const char* mirrors[] = { "Catboy.best", "Nerinyan.moe" };
-                        if (ImGui::Combo("Mirror", &mirrorIndex, mirrors, IM_ARRAYSIZE(mirrors))) {
+                        std::vector<std::string> providerNames = ProviderRegistry::Instance().GetProviderNames();
+                        std::vector<const char*> mirrors;
+                        for (const auto& name : providerNames) {
+                            mirrors.push_back(name.c_str());
+                        }
+
+                        if (ImGui::Combo("Mirror", &mirrorIndex, mirrors.data(), (int)mirrors.size())) {
                             ConfigManager::Instance().SetDownloadMirrorIndex(mirrorIndex);
                         }
 

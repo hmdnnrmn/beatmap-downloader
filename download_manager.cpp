@@ -11,6 +11,7 @@
 #include <mutex>
 #include <memory>
 #include "providers/ProviderRegistry.h"
+#include "HistoryManager.h"
 
 namespace fs = std::filesystem;
 
@@ -86,6 +87,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
         if (!CreateDirectoryW(songsPath.c_str(), NULL)) {
              LogError("Songs directory does not exist and could not be created.");
              UpdateDownloadState(beatmapId, L"Error: No Songs Dir", 0, 0, 0, false);
+             HistoryManager::Instance().AddEntry({filename, beatmapId, "Failed (No Songs Dir)", std::time(nullptr)});
              return false;
         }
     }
@@ -107,6 +109,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     if (success) {
         LogInfo("Successfully downloaded: " + std::string(filename.begin(), filename.end()));
         UpdateDownloadState(beatmapId, L"Complete", 100, 0, 0, false);
+        HistoryManager::Instance().AddEntry({filename, beatmapId, "Success", std::time(nullptr)});
 
         if (ConfigManager::Instance().GetAutoOpen()) {
             ShellExecuteW(NULL, L"open", fullPath.c_str(), NULL, NULL, SW_HIDE);
@@ -115,6 +118,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     } else {
         LogError("Download failed: " + error);
         UpdateDownloadState(beatmapId, L"Failed", 0, 0, 0, false);
+        HistoryManager::Instance().AddEntry({filename, beatmapId, "Failed", std::time(nullptr)});
         return false;
     }
 }
@@ -157,6 +161,7 @@ bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
         ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);
         
         UpdateDownloadState(beatmapsetId, L"Failed (Browser Opened)", 0, 0, 0, false);
+        // History entry added in TryDownloadFromUrl
         return false;
     }
     

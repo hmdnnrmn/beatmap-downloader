@@ -20,7 +20,8 @@ namespace network {
         // Synchronous methods
         static bool Download(const std::string& url, const std::wstring& destPath, 
                              ProgressCallback progressCb = nullptr, 
-                             std::string* outError = nullptr);
+                             std::string* outError = nullptr,
+                             long timeoutSeconds = 300);
 
         static bool Get(const std::string& url, std::string& outResponse, 
                         std::string* outError = nullptr);
@@ -31,7 +32,8 @@ namespace network {
         // Asynchronous methods
         static void DownloadAsync(const std::string& url, const std::wstring& destPath,
                                   ProgressCallback progressCb,
-                                  CompletionCallback completionCb);
+                                  CompletionCallback completionCb,
+                                  long timeoutSeconds = 300);
 
         static void GetAsync(const std::string& url, 
                              CompletionCallback completionCb);

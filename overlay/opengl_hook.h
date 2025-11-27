@@ -12,6 +12,9 @@
 #include "../download_manager.h"
 #include "../config_manager.h"
 #include "../providers/ProviderRegistry.h"
+#include "../speedtest_manager.h"
+#include "TabManager.h"
+#include "TabRegistry.h"
 
 static HGLRC        g_LastGLRC         = nullptr;
 static HWND         g_TargetHwnd       = nullptr;
@@ -111,70 +114,7 @@ namespace OverlayGL {
         if (g_OverlayVisible) {
             ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("osu! Beatmap Downloader", &g_OverlayVisible)) {
-                
-                if (ImGui::BeginTabBar("MainTabs")) {
-                    if (ImGui::BeginTabItem("Status")) {
-                        DownloadState state = GetDownloadState();
-                        if (state.isDownloading) {
-                            std::string filenameStr(state.filename.begin(), state.filename.end());
-                            ImGui::Text("Downloading: %s", filenameStr.c_str());
-                            ImGui::ProgressBar(state.progress / 100.0f, ImVec2(-1, 0), 
-                                std::to_string((int)state.progress).c_str());
-                            ImGui::Text("%.2f MB / %.2f MB", 
-                                state.downloadedBytes / (1024.0f * 1024.0f), 
-                                state.totalBytes / (1024.0f * 1024.0f));
-                        } else {
-                            ImGui::Text("Idle. Waiting for beatmap link...");
-                        }
-                        ImGui::EndTabItem();
-                    }
-
-                    if (ImGui::BeginTabItem("Settings")) {
-                        static char songsPath[256] = "";
-                        static int mirrorIndex = 0;
-                        static bool autoOpen = false;
-                        static bool clipboardEnabled = true;
-                        static bool initSettings = false;
-
-                        if (!initSettings) {
-                            std::wstring wPath = ConfigManager::Instance().GetSongsPath();
-                            std::string sPath(wPath.begin(), wPath.end());
-                            strcpy_s(songsPath, sPath.c_str());
-                            
-                            mirrorIndex = ConfigManager::Instance().GetDownloadMirrorIndex();
-                            autoOpen = ConfigManager::Instance().GetAutoOpen();
-                            clipboardEnabled = ConfigManager::Instance().IsClipboardEnabled();
-                            initSettings = true;
-                        }
-
-                        if (ImGui::InputText("Songs Path", songsPath, IM_ARRAYSIZE(songsPath))) {
-                            std::string sPath = songsPath;
-                            std::wstring wPath(sPath.begin(), sPath.end());
-                            ConfigManager::Instance().SetSongsPath(wPath);
-                        }
-                        
-                        std::vector<std::string> providerNames = ProviderRegistry::Instance().GetProviderNames();
-                        std::vector<const char*> mirrors;
-                        for (const auto& name : providerNames) {
-                            mirrors.push_back(name.c_str());
-                        }
-
-                        if (ImGui::Combo("Mirror", &mirrorIndex, mirrors.data(), (int)mirrors.size())) {
-                            ConfigManager::Instance().SetDownloadMirrorIndex(mirrorIndex);
-                        }
-
-                        if (ImGui::Checkbox("Auto Open (.osz)", &autoOpen)) {
-                            ConfigManager::Instance().SetAutoOpen(autoOpen);
-                        }
-
-                        if (ImGui::Checkbox("Enable Clipboard Listener", &clipboardEnabled)) {
-                            ConfigManager::Instance().SetClipboardEnabled(clipboardEnabled);
-                        }
-
-                        ImGui::EndTabItem();
-                    }
-                    ImGui::EndTabBar();
-                }
+                TabManager::Instance().Render();
             }
             ImGui::End();
         }
@@ -245,6 +185,9 @@ namespace OverlayGL {
         
         // Initial state check
         UpdateRawInputState();
+
+        // Register Tabs
+        TabRegistry::RegisterAllTabs();
 
         LogInfo("ImGui initialized for OpenGL3 + Win32.");
     }

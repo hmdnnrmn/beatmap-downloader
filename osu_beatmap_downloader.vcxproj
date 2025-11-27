@@ -107,6 +107,7 @@
     <ClCompile Include="download_queue.cpp" />
     <ClCompile Include="network\HttpRequest.cpp" />
     <ClCompile Include="overlay\opengl_hook.cpp" />
+    <ClCompile Include="overlay\TabRegistry.cpp" />
     <ClCompile Include="overlay\imgui\imgui.cpp" />
     <ClCompile Include="overlay\imgui\imgui_draw.cpp" />
     <ClCompile Include="overlay\imgui\imgui_tables.cpp" />
@@ -120,6 +121,8 @@
     <ClCompile Include="providers\OsuDirect.cpp" />
     <ClCompile Include="providers\Beatconnect.cpp" />
     <ClCompile Include="providers\Resolver.cpp" />
+    <ClCompile Include="speedtest_manager.cpp" />
+    <ClCompile Include="HistoryManager.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -132,6 +135,7 @@
     <ClInclude Include="download_queue.h" />
     <ClInclude Include="network\HttpRequest.h" />
     <ClInclude Include="overlay\opengl_hook.h" />
+    <ClInclude Include="overlay\TabRegistry.h" />
     <ClInclude Include="providers\Provider.h" />
     <ClInclude Include="providers\Catboy.h" />
     <ClInclude Include="providers\Nerinyan.h" />
@@ -140,6 +144,9 @@
     <ClInclude Include="providers\OsuDirect.h" />
     <ClInclude Include="providers\Beatconnect.h" />
     <ClInclude Include="providers\Resolver.h" />
+    <ClInclude Include="speedtest_manager.h" />
+    <ClInclude Include="HistoryManager.h" />
+    <ClInclude Include="overlay\tabs\HistoryTab.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

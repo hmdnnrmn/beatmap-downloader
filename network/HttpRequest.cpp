@@ -42,7 +42,7 @@ namespace network {
     }
 
     bool HttpRequest::Download(const std::string& url, const std::wstring& destPath, 
-                               ProgressCallback progressCb, std::string* outError) {
+                               ProgressCallback progressCb, std::string* outError, long timeoutSeconds) {
         CURL* curl = curl_easy_init();
         if (!curl) {
             if (outError) *outError = "Failed to init curl";
@@ -68,7 +68,7 @@ namespace network {
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); // For compatibility
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "osu! Beatmap Downloader/1.0");
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeoutSeconds);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
 
         CURLcode res = curl_easy_perform(curl);
@@ -160,10 +160,10 @@ namespace network {
     }
 
     void HttpRequest::DownloadAsync(const std::string& url, const std::wstring& destPath,
-                                    ProgressCallback progressCb, CompletionCallback completionCb) {
+                                    ProgressCallback progressCb, CompletionCallback completionCb, long timeoutSeconds) {
         std::thread([=]() {
             std::string error;
-            bool success = Download(url, destPath, progressCb, &error);
+            bool success = Download(url, destPath, progressCb, &error, timeoutSeconds);
             if (completionCb) completionCb(success, error);
         }).detach();
     }

@@ -6,4 +6,5 @@ public:
     std::wstring ResolveBeatmapSetId(const std::wstring& id, bool isBeatmapId) override;
     std::string GetDownloadUrl(const std::wstring& id, bool isBeatmapId) override;
     std::string GetName() const override { return "Nerinyan"; }
+    std::vector<BeatmapSetInfo> Search(const std::string& query, const SearchFilter& filter) override;
 };

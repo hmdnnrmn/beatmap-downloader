@@ -37,6 +37,9 @@ namespace network {
 
         static void GetAsync(const std::string& url, 
                              CompletionCallback completionCb);
+
+        // Utility
+        static std::string UrlEncode(const std::string& value);
     };
 
 }

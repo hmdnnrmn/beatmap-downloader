@@ -9,7 +9,7 @@ ConfigManager& ConfigManager::Instance() {
     return instance;
 }
 
-ConfigManager::ConfigManager() : m_autoOpen(true), m_mirrorIndex(0), m_clipboardEnabled(true) {
+ConfigManager::ConfigManager() : m_autoOpen(true), m_mirrorIndex(0), m_metadataMirrorIndex(0), m_clipboardEnabled(true) {
     // Set config path to be next to the DLL
     wchar_t dllPath[MAX_PATH];
     GetModuleFileNameW(GetModuleHandle(NULL), dllPath, MAX_PATH);
@@ -56,6 +56,7 @@ bool ConfigManager::LoadConfig() {
 
     // Load Mirror Index
     m_mirrorIndex = GetPrivateProfileIntW(L"General", L"MirrorIndex", 0, m_configPath.c_str());
+    m_metadataMirrorIndex = GetPrivateProfileIntW(L"General", L"MetadataMirrorIndex", 0, m_configPath.c_str());
 
     // Load AutoOpen
     m_autoOpen = GetPrivateProfileIntW(L"General", L"AutoOpen", 1, m_configPath.c_str()) != 0;
@@ -71,6 +72,7 @@ void ConfigManager::SaveConfig() {
     WritePrivateProfileStringW(L"General", L"SongsPath", m_songsPath.c_str(), m_configPath.c_str());
     
     WritePrivateProfileStringW(L"General", L"MirrorIndex", std::to_wstring(m_mirrorIndex).c_str(), m_configPath.c_str());
+    WritePrivateProfileStringW(L"General", L"MetadataMirrorIndex", std::to_wstring(m_metadataMirrorIndex).c_str(), m_configPath.c_str());
     
     WritePrivateProfileStringW(L"General", L"AutoOpen", m_autoOpen ? L"1" : L"0", m_configPath.c_str());
 
@@ -85,6 +87,10 @@ std::wstring ConfigManager::GetSongsPath() const {
 
 int ConfigManager::GetDownloadMirrorIndex() const {
     return m_mirrorIndex;
+}
+
+int ConfigManager::GetMetadataMirrorIndex() const {
+    return m_metadataMirrorIndex;
 }
 
 bool ConfigManager::GetAutoOpen() const {
@@ -102,6 +108,11 @@ void ConfigManager::SetSongsPath(const std::wstring& path) {
 
 void ConfigManager::SetDownloadMirrorIndex(int index) {
     m_mirrorIndex = index;
+    SaveConfig();
+}
+
+void ConfigManager::SetMetadataMirrorIndex(int index) {
+    m_metadataMirrorIndex = index;
     SaveConfig();
 }
 

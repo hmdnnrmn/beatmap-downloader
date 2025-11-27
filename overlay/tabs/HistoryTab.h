@@ -1,5 +1,5 @@
 #pragma once
-#include "../OverlayTab.h"
+#include "OverlayTab.h"
 #include "../../HistoryManager.h"
 #include "imgui.h"
 #include <ctime>

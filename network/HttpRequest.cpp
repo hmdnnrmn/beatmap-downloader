@@ -177,4 +177,19 @@ namespace network {
         }).detach();
     }
 
+    std::string HttpRequest::UrlEncode(const std::string& value) {
+        CURL* curl = curl_easy_init();
+        if (curl) {
+            char* output = curl_easy_escape(curl, value.c_str(), (int)value.length());
+            if (output) {
+                std::string result = output;
+                curl_free(output);
+                curl_easy_cleanup(curl);
+                return result;
+            }
+            curl_easy_cleanup(curl);
+        }
+        return value;
+    }
+
 }

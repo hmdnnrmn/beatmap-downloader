@@ -20,7 +20,7 @@ bool InitializeDownloadManager();
 void CleanupDownloadManager();
 bool CheckIfMapExists(const std::wstring& beatmapId);
 bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId = false);
-bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beatmapId);
+bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& filename, const std::wstring& beatmapId, const std::wstring& title);
 void CheckClipboardForBeatmapLinks();
 
 #endif

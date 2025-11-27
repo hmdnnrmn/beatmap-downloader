@@ -11,6 +11,7 @@
 #include <mutex>
 #include <memory>
 #include "providers/ProviderRegistry.h"
+#include "providers/Resolver.h"
 #include "HistoryManager.h"
 
 namespace fs = std::filesystem;
@@ -75,9 +76,8 @@ bool CheckIfMapExists(const std::wstring& beatmapId) {
     return false;
 }
 
-bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beatmapId) {
+bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& filename, const std::wstring& beatmapId, const std::wstring& title) {
     std::wstring songsPath = ConfigManager::Instance().GetSongsPath();
-    std::wstring filename = beatmapId + L".osz";
     std::wstring fullPath = songsPath + L"\\" + filename;
 
     LogDebug("Target path: " + std::string(fullPath.begin(), fullPath.end()));
@@ -87,7 +87,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
         if (!CreateDirectoryW(songsPath.c_str(), NULL)) {
              LogError("Songs directory does not exist and could not be created.");
              UpdateDownloadState(beatmapId, L"Error: No Songs Dir", 0, 0, 0, false);
-             HistoryManager::Instance().AddEntry({filename, beatmapId, "Failed (No Songs Dir)", std::time(nullptr)});
+             HistoryManager::Instance().AddEntry({title, beatmapId, "Failed (No Songs Dir)", std::time(nullptr)});
              return false;
         }
     }
@@ -109,7 +109,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     if (success) {
         LogInfo("Successfully downloaded: " + std::string(filename.begin(), filename.end()));
         UpdateDownloadState(beatmapId, L"Complete", 100, 0, 0, false);
-        HistoryManager::Instance().AddEntry({filename, beatmapId, "Success", std::time(nullptr)});
+        HistoryManager::Instance().AddEntry({title, beatmapId, "Success", std::time(nullptr)});
 
         if (ConfigManager::Instance().GetAutoOpen()) {
             ShellExecuteW(NULL, L"open", fullPath.c_str(), NULL, NULL, SW_HIDE);
@@ -118,30 +118,76 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& beat
     } else {
         LogError("Download failed: " + error);
         UpdateDownloadState(beatmapId, L"Failed", 0, 0, 0, false);
-        HistoryManager::Instance().AddEntry({filename, beatmapId, "Failed", std::time(nullptr)});
+        HistoryManager::Instance().AddEntry({title, beatmapId, "Failed", std::time(nullptr)});
         return false;
     }
 }
 
 bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
-    int mirrorIndex = ConfigManager::Instance().GetDownloadMirrorIndex();
-    std::unique_ptr<Provider> provider = ProviderRegistry::Instance().CreateProvider(mirrorIndex);
+    // 1. Resolve ID to SetID
+    std::wstring beatmapsetId = id;
+    if (isBeatmapId) {
+        beatmapsetId = Resolver::ResolveSetIdFromBeatmapId(id);
+        if (beatmapsetId.empty()) {
+            LogError("Failed to resolve BeatmapSet ID from Beatmap ID: " + std::string(id.begin(), id.end()));
+            UpdateDownloadState(id, L"Failed (ID Resolution)", 0, 0, 0, false);
+            return false;
+        }
+    }
 
-    if (!provider) {
-        LogError("Invalid provider index: " + std::to_string(mirrorIndex));
-        UpdateDownloadState(id, L"Failed (Invalid Provider)", 0, 0, 0, false);
+    // 2. Fetch Metadata using Metadata Mirror
+    int metadataMirrorIndex = ConfigManager::Instance().GetMetadataMirrorIndex();
+    // We assume index 0 is osu.direct and 1 is catboy for metadata, but we should probably check names or use a specific logic.
+    // For now, let's try to get the provider by index from registry.
+    // If the user selected a provider that doesn't support metadata (returns nullopt), we might fallback or fail.
+    // Given the user instruction, we assume the user will select a valid metadata mirror (osu.direct or catboy).
+    
+    std::unique_ptr<Provider> metadataProvider = ProviderRegistry::Instance().CreateProvider(metadataMirrorIndex);
+    if (!metadataProvider) {
+        LogError("Invalid metadata provider index: " + std::to_string(metadataMirrorIndex));
+        // Fallback to default filename if metadata fails? Or fail?
+        // Let's try to proceed with default filename if metadata fails, but user asked for specific format.
+    }
+
+    std::wstring filename = beatmapsetId + L".osz";
+    std::wstring title = beatmapsetId; // Default title is ID
+
+    if (metadataProvider) {
+        auto info = metadataProvider->GetBeatmapSetInfo(beatmapsetId);
+        if (info.has_value()) {
+            // Format: "{setid} Artist - Title"
+            // We need to sanitize filename
+            std::wstring artist = info->artist;
+            std::wstring mapTitle = info->title;
+            
+            // Basic sanitization
+            auto sanitize = [](std::wstring& s) {
+                const std::wstring invalid = L"\\/:*?\"<>|";
+                for (auto& c : s) {
+                    if (invalid.find(c) != std::wstring::npos) c = L'_';
+                }
+            };
+            sanitize(artist);
+            sanitize(mapTitle);
+
+            filename = beatmapsetId + L" " + artist + L" - " + mapTitle + L".osz";
+            title = artist + L" - " + mapTitle;
+        } else {
+            LogInfo("Failed to fetch metadata using " + metadataProvider->GetName() + ", using default filename.");
+        }
+    }
+
+    // 3. Download using Download Mirror
+    int downloadMirrorIndex = ConfigManager::Instance().GetDownloadMirrorIndex();
+    std::unique_ptr<Provider> downloadProvider = ProviderRegistry::Instance().CreateProvider(downloadMirrorIndex);
+
+    if (!downloadProvider) {
+        LogError("Invalid download provider index: " + std::to_string(downloadMirrorIndex));
+        UpdateDownloadState(beatmapsetId, L"Failed (Invalid Provider)", 0, 0, 0, false);
         return false;
     }
 
-    std::wstring beatmapsetId = provider->ResolveBeatmapSetId(id, isBeatmapId);
-
-    if (beatmapsetId.empty()) {
-        LogError("Failed to resolve BeatmapSet ID using provider: " + provider->GetName());
-        UpdateDownloadState(id, L"Failed (ID Resolution)", 0, 0, 0, false);
-        return false;
-    }
-
-    LogInfo("Starting download for ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()) + " using " + provider->GetName());
+    LogInfo("Starting download for ID: " + std::string(beatmapsetId.begin(), beatmapsetId.end()) + " using " + downloadProvider->GetName());
     
     // Reset state
     UpdateDownloadState(beatmapsetId, L"Initializing...", 0, 0, 0, true);
@@ -152,16 +198,15 @@ bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
         return true;
     }
 
-    std::string downloadUrl = provider->GetDownloadUrl(beatmapsetId, isBeatmapId);
+    std::string downloadUrl = downloadProvider->GetDownloadUrl(beatmapsetId, false); // We already resolved to SetID
     LogDebug("Download URL: " + downloadUrl);
 
-    if (!TryDownloadFromUrl(downloadUrl, beatmapsetId)) {
-        std::string osuUrl = "https://osu.ppy.sh/b/" + std::string(id.begin(), id.end());
+    if (!TryDownloadFromUrl(downloadUrl, filename, beatmapsetId, title)) {
+        std::string osuUrl = "https://osu.ppy.sh/b/" + std::string(id.begin(), id.end()); // Use original ID for browser link if available
         LogInfo("Opening official osu! website...");
         ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);
         
         UpdateDownloadState(beatmapsetId, L"Failed (Browser Opened)", 0, 0, 0, false);
-        // History entry added in TryDownloadFromUrl
         return false;
     }
     

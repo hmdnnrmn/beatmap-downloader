@@ -27,7 +27,7 @@ namespace InputHook {
         // Create a list of devices to remove (specifically mouse)
         std::vector<RAWINPUTDEVICE> removeDevices;
         for (const auto& dev : devices) {
-            if (dev.usUsagePage == 1 && dev.usUsage == 2) { // Generic Desktop Controls, Mouse
+            if (dev.usUsagePage == 1 && (dev.usUsage == 2 || dev.usUsage == 6)) { // Generic Desktop Controls: Mouse (2) or Keyboard (6)
                 RAWINPUTDEVICE removeDev = dev;
                 removeDev.dwFlags = RIDEV_REMOVE;
                 removeDev.hwndTarget = NULL; // Must be NULL for RIDEV_REMOVE

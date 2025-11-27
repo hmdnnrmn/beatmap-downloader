@@ -1,5 +1,5 @@
 #include "notification_manager.h"
-#include "logging.h"
+#include "utils/logging.h"
 
 #define WM_TRAYICON (WM_USER + 1)
 

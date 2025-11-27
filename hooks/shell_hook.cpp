@@ -1,12 +1,12 @@
 // shell_hook.cpp
 #include "shell_hook.h"
-#include "download_manager.h"
-#include "logging.h"
+#include "features/download_manager.h"
+#include "utils/logging.h"
 #include "network/HttpRequest.h"
 #include <iostream>
 #include <string>
 #include <regex>
-#include "download_queue.h"
+#include "features/download_queue.h"
 
 // Original function pointer
 typedef BOOL(WINAPI* pShellExecuteExW)(SHELLEXECUTEINFOW*);

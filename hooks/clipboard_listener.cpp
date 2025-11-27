@@ -1,7 +1,7 @@
 #include "clipboard_listener.h"
-#include "download_manager.h"
-#include "logging.h"
-#include "config_manager.h"
+#include "features/download_manager.h"
+#include "utils/logging.h"
+#include "config/config_manager.h"
 #include <thread>
 #include <atomic>
 #include <regex>

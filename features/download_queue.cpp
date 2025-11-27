@@ -1,6 +1,6 @@
 #include "download_queue.h"
 #include "download_manager.h"
-#include "logging.h"
+#include "utils/logging.h"
 #include "notification_manager.h"
 
 DownloadQueue& DownloadQueue::Instance() {

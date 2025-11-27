@@ -1,8 +1,8 @@
 #include "speedtest_manager.h"
 #include "providers/ProviderRegistry.h"
 #include "network/HttpRequest.h"
-#include "config_manager.h"
-#include "logging.h"
+#include "config/config_manager.h"
+#include "utils/logging.h"
 #include <chrono>
 #include <filesystem>
 #include <iomanip>

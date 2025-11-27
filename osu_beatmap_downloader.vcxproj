@@ -63,7 +63,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;CURL_STATICLIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(ProjectDir)libs;$(ProjectDir)libs\curl\include;$(ProjectDir)overlay;$(ProjectDir)overlay\imgui;$(ProjectDir)overlay\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)libs;$(ProjectDir)libs\curl\include;$(ProjectDir)overlay;$(ProjectDir)overlay\imgui;$(ProjectDir)overlay\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -83,7 +83,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;CURL_STATICLIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(ProjectDir)libs;$(ProjectDir)libs\curl\include;$(ProjectDir)overlay;$(ProjectDir)overlay\imgui;$(ProjectDir)overlay\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)libs;$(ProjectDir)libs\curl\include;$(ProjectDir)overlay;$(ProjectDir)overlay\imgui;$(ProjectDir)overlay\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -98,12 +98,12 @@
 
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="shell_hook.cpp" />
-    <ClCompile Include="clipboard_listener.cpp" />
-    <ClCompile Include="download_manager.cpp" />
-    <ClCompile Include="config_manager.cpp" />
-    <ClCompile Include="notification_manager.cpp" />
-    <ClCompile Include="download_queue.cpp" />
+    <ClCompile Include="hooks\shell_hook.cpp" />
+    <ClCompile Include="hooks\clipboard_listener.cpp" />
+    <ClCompile Include="features\download_manager.cpp" />
+    <ClCompile Include="config\config_manager.cpp" />
+    <ClCompile Include="features\notification_manager.cpp" />
+    <ClCompile Include="features\download_queue.cpp" />
     <ClCompile Include="network\HttpRequest.cpp" />
     <ClCompile Include="overlay\opengl_hook.cpp" />
     <ClCompile Include="overlay\OverlayManager.cpp" />
@@ -122,18 +122,18 @@
     <ClCompile Include="providers\OsuDirect.cpp" />
     <ClCompile Include="providers\Beatconnect.cpp" />
     <ClCompile Include="providers\Resolver.cpp" />
-    <ClCompile Include="speedtest_manager.cpp" />
-    <ClCompile Include="HistoryManager.cpp" />
+    <ClCompile Include="features\speedtest_manager.cpp" />
+    <ClCompile Include="features\HistoryManager.cpp" />
   </ItemGroup>
 
   <ItemGroup>
-    <ClInclude Include="shell_hook.h" />
-    <ClInclude Include="clipboard_listener.h" />
-    <ClInclude Include="download_manager.h" />
+    <ClInclude Include="hooks\shell_hook.h" />
+    <ClInclude Include="hooks\clipboard_listener.h" />
+    <ClInclude Include="features\download_manager.h" />
     <ClInclude Include="providers\Beatconnect.h" />
     <ClInclude Include="providers\Resolver.h" />
-    <ClInclude Include="speedtest_manager.h" />
-    <ClInclude Include="HistoryManager.h" />
+    <ClInclude Include="features\speedtest_manager.h" />
+    <ClInclude Include="features\HistoryManager.h" />
     <ClInclude Include="overlay\tabs\HistoryTab.h" />
     <ClInclude Include="overlay\tabs\SearchTab.h" />
     <ClInclude Include="overlay\tabs\TabManager.h" />

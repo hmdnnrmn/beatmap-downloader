@@ -63,7 +63,7 @@ std::string CatboyProvider::GetDownloadUrl(const std::wstring& id, bool isBeatma
     return "https://catboy.best/d/" + idStr;
 }
 
-#include "../network/HttpRequest.h"
+
 #include <nlohmann/json.hpp>
 #include <iostream>
 

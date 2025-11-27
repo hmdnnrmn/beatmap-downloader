@@ -4,19 +4,19 @@
 #include <io.h>
 #include <fcntl.h>
 
-#include "shell_hook.h"
+#include "hooks/shell_hook.h"
 
-#include "clipboard_listener.h"
+#include "hooks/clipboard_listener.h"
 
-#include "download_manager.h"
+#include "features/download_manager.h"
 
-#include "logging.h"
+#include "utils/logging.h"
 
-#include "config_manager.h"
+#include "config/config_manager.h"
 
-#include "notification_manager.h"
+#include "features/notification_manager.h"
 
-#include "download_queue.h"
+#include "features/download_queue.h"
 #include "overlay/opengl_hook.h"
 
 

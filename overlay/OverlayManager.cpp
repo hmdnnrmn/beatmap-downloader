@@ -4,7 +4,7 @@
 #include "input_hook.h"
 #include "tabs/TabManager.h"
 #include "tabs/TabRegistry.h"
-#include "../download_manager.h"
+#include "features/download_manager.h"
 #include <iostream>
 
 OverlayManager& OverlayManager::Instance() {

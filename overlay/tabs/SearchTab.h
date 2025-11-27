@@ -1,7 +1,7 @@
 #pragma once
 #include "OverlayTab.h"
-#include "../../providers/ProviderRegistry.h"
-#include "../../download_manager.h"
+#include "providers/ProviderRegistry.h"
+#include "features/download_manager.h"
 #include "imgui.h"
 #include <vector>
 #include <string>

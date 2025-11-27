@@ -1,6 +1,6 @@
 #include "Resolver.h"
 #include "../network/HttpRequest.h"
-#include "../logging.h"
+#include "utils/logging.h"
 #include <iostream>
 
 std::wstring Resolver::ResolveSetIdFromBeatmapId(const std::wstring& beatmapId) {

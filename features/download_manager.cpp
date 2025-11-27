@@ -1,11 +1,11 @@
 // download_manager.cpp
 #include "download_manager.h"
 #include <iostream>
-#include "logging.h"
+#include "utils/logging.h"
 #include "network/HttpRequest.h"
 #include <shlobj.h>
 #include <shellapi.h>
-#include "config_manager.h"
+#include "config/config_manager.h"
 #include "notification_manager.h"
 #include <filesystem>
 #include <mutex>

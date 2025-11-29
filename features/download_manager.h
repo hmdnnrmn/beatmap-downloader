@@ -19,7 +19,7 @@ DownloadState GetDownloadState();
 bool InitializeDownloadManager();
 void CleanupDownloadManager();
 bool CheckIfMapExists(const std::wstring& beatmapId);
-bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId = false);
+bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId = false, const std::wstring& artist = L"", const std::wstring& title = L"");
 bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& filename, const std::wstring& beatmapId, const std::wstring& title);
 void CheckClipboardForBeatmapLinks();
 

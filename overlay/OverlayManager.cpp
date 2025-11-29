@@ -1,4 +1,5 @@
 #include "OverlayManager.h"
+#include "StyleManager.h"
 #include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_opengl3.h"
 #include "input_hook.h"
@@ -28,15 +29,18 @@ void OverlayManager::Initialize(HDC hdc) {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    // Load Fonts
+    StyleManager::Instance().LoadFonts();
+
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    StyleManager::Instance().ApplyTheme();
 
     // Setup Platform/Renderer backends
     if (!ImGui_ImplWin32_Init(m_TargetWindow)) {
         std::cerr << "[OverlayManager] ImGui_ImplWin32_Init failed." << std::endl;
         return;
     }
-    
+
     if (!ImGui_ImplOpenGL3_Init()) {
          std::cerr << "[OverlayManager] ImGui_ImplOpenGL3_Init failed." << std::endl;
          ImGui_ImplWin32_Shutdown();
@@ -92,7 +96,7 @@ void OverlayManager::Render() {
 
     // Non-blocking Download Popup
     DownloadState state = GetDownloadState();
-    if (state.isDownloading && !m_Visible) {
+    if (state.isDownloading) {
         ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 320, ImGui::GetIO().DisplaySize.y - 80), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(300, 60), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.6f);

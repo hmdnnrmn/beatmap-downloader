@@ -123,7 +123,7 @@ bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& file
     }
 }
 
-bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
+bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId, const std::wstring& artist, const std::wstring& title) {
     // 1. Resolve ID to SetID
     std::wstring beatmapsetId = id;
     if (isBeatmapId) {
@@ -150,15 +150,34 @@ bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
     }
 
     std::wstring filename = beatmapsetId + L".osz";
-    std::wstring title = beatmapsetId; // Default title is ID
+    std::wstring finalTitle = beatmapsetId; // Default title is ID
 
-    if (metadataProvider) {
+    bool metadataAvailable = !artist.empty() && !title.empty();
+    
+    if (metadataAvailable) {
+         // Use provided metadata
+        std::wstring safeArtist = artist;
+        std::wstring safeTitle = title;
+        
+        // Basic sanitization
+        auto sanitize = [](std::wstring& s) {
+            const std::wstring invalid = L"\\/:*?\"<>|";
+            for (auto& c : s) {
+                if (invalid.find(c) != std::wstring::npos) c = L'_';
+            }
+        };
+        sanitize(safeArtist);
+        sanitize(safeTitle);
+
+        filename = beatmapsetId + L" " + safeArtist + L" - " + safeTitle + L".osz";
+        finalTitle = safeArtist + L" - " + safeTitle;
+    } else if (metadataProvider) {
         auto info = metadataProvider->GetBeatmapSetInfo(beatmapsetId);
         if (info.has_value()) {
             // Format: "{setid} Artist - Title"
             // We need to sanitize filename
-            std::wstring artist = info->artist;
-            std::wstring mapTitle = info->title;
+            std::wstring fetchedArtist = info->artist;
+            std::wstring fetchedTitle = info->title;
             
             // Basic sanitization
             auto sanitize = [](std::wstring& s) {
@@ -167,11 +186,11 @@ bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
                     if (invalid.find(c) != std::wstring::npos) c = L'_';
                 }
             };
-            sanitize(artist);
-            sanitize(mapTitle);
+            sanitize(fetchedArtist);
+            sanitize(fetchedTitle);
 
-            filename = beatmapsetId + L" " + artist + L" - " + mapTitle + L".osz";
-            title = artist + L" - " + mapTitle;
+            filename = beatmapsetId + L" " + fetchedArtist + L" - " + fetchedTitle + L".osz";
+            finalTitle = fetchedArtist + L" - " + fetchedTitle;
         } else {
             LogInfo("Failed to fetch metadata using " + metadataProvider->GetName() + ", using default filename.");
         }
@@ -195,13 +214,14 @@ bool DownloadBeatmap(const std::wstring& id, bool isBeatmapId) {
     if (CheckIfMapExists(beatmapsetId)) {
         LogInfo("Map already exists, skipping download.");
         UpdateDownloadState(beatmapsetId, L"Skipped (Exists)", 100, 0, 0, false);
+        HistoryManager::Instance().AddEntry({finalTitle, beatmapsetId, "Skipped (Exists)", std::time(nullptr)});
         return true;
     }
 
     std::string downloadUrl = downloadProvider->GetDownloadUrl(beatmapsetId, false); // We already resolved to SetID
     LogDebug("Download URL: " + downloadUrl);
 
-    if (!TryDownloadFromUrl(downloadUrl, filename, beatmapsetId, title)) {
+    if (!TryDownloadFromUrl(downloadUrl, filename, beatmapsetId, finalTitle)) {
         std::string osuUrl = "https://osu.ppy.sh/b/" + std::string(id.begin(), id.end()); // Use original ID for browser link if available
         LogInfo("Opening official osu! website...");
         ShellExecuteA(NULL, "open", osuUrl.c_str(), NULL, NULL, SW_SHOW);

@@ -124,3 +124,59 @@ std::vector<BeatmapSetInfo> OsuDirectProvider::Search(const std::string& query, 
     }
     return {};
 }
+
+std::vector<OsuDirectProvider::Recommendation> OsuDirectProvider::GetRecommendations(float minStars, float maxStars, int mode, int status) {
+    // https://osu.direct/api/recommend?amount=20&minStars=4.6&maxStars=5.1&mode=0&status=1
+    std::string url = "https://osu.direct/api/recommend?amount=10";
+    url += "&minStars=" + std::to_string(minStars);
+    url += "&maxStars=" + std::to_string(maxStars);
+    
+    if (mode >= 0) {
+        url += "&mode=" + std::to_string(mode);
+    }
+    
+    if (status >= -2) {
+        url += "&status=" + std::to_string(status);
+    }
+
+    std::string response;
+    if (network::HttpRequest::Get(url, response)) {
+        try {
+            auto json = nlohmann::json::parse(response);
+            std::vector<Recommendation> results;
+
+            for (const auto& item : json) {
+                Recommendation rec;
+                rec.parentSetId = item.value("ParentSetID", 0);
+                rec.beatmapId = item.value("BeatmapID", 0);
+                rec.diffName = item.value("DiffName", "Unknown");
+                rec.stars = item.value("DifficultyRating", 0.0f);
+                
+                // Metadata will be fetched asynchronously by the UI
+                rec.artist = "Loading...";
+                rec.title = "Loading...";
+                
+                /*
+                // Fetch metadata
+                if (rec.parentSetId > 0) {
+                    auto setInfo = GetBeatmapSetInfo(std::to_wstring(rec.parentSetId));
+                    if (setInfo.has_value()) {
+                        rec.artist = std::string(setInfo->artist.begin(), setInfo->artist.end());
+                        rec.title = std::string(setInfo->title.begin(), setInfo->title.end());
+                    } else {
+                        rec.artist = "Unknown";
+                        rec.title = "Unknown";
+                    }
+                }
+                */
+
+                results.push_back(rec);
+            }
+            return results;
+        }
+        catch (const std::exception& e) {
+            std::cerr << "JSON Parse Error (GetRecommendations): " << e.what() << std::endl;
+        }
+    }
+    return {};
+}

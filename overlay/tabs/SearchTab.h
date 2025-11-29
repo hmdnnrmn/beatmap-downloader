@@ -1,3 +1,4 @@
+
 #pragma once
 #include "OverlayTab.h"
 #include "providers/ProviderRegistry.h"
@@ -6,6 +7,9 @@
 #include <vector>
 #include <string>
 #include <future>
+
+// Include for HistoryManager
+#include "features/HistoryManager.h"
 
 class SearchTab : public OverlayTab {
 public:
@@ -86,43 +90,62 @@ public:
         }
 
         ImGui::Separator();
+        ImGui::Spacing();
 
-        // Results Table
-        if (ImGui::BeginTable("SearchResults", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
-            ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Artist", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Mapper", ImGuiTableColumnFlags_WidthFixed, 100.0f);
-            ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-            ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-            ImGui::TableHeadersRow();
+        // Results Table in Child Window
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyle().Colors[ImGuiCol_FrameBg]);
+        if (ImGui::BeginChild("SearchResultsChild", ImVec2(0, 0), true, ImGuiWindowFlags_None)) {
+            if (ImGui::BeginTable("SearchResults", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
+                ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Artist", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Mapper", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+                ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                ImGui::TableHeadersRow();
 
-            int i = 0;
-            for (const auto& map : results) {
-                ImGui::PushID(i++);
-                ImGui::TableNextRow();
-                
-                ImGui::TableSetColumnIndex(0);
-                std::string title(map.title.begin(), map.title.end());
-                ImGui::Text("%s", title.c_str());
+                int i = 0;
+                for (const auto& map : results) {
+                    ImGui::PushID(i++);
+                    ImGui::TableNextRow();
+                    
+                    ImGui::TableSetColumnIndex(0);
+                    std::string title(map.title.begin(), map.title.end());
+                    ImGui::Text("%s", title.c_str());
 
-                ImGui::TableSetColumnIndex(1);
-                std::string artist(map.artist.begin(), map.artist.end());
-                ImGui::Text("%s", artist.c_str());
+                    ImGui::TableSetColumnIndex(1);
+                    std::string artist(map.artist.begin(), map.artist.end());
+                    ImGui::Text("%s", artist.c_str());
 
-                ImGui::TableSetColumnIndex(2);
-                std::string creator(map.creator.begin(), map.creator.end());
-                ImGui::Text("%s", creator.c_str());
+                    ImGui::TableSetColumnIndex(2);
+                    std::string creator(map.creator.begin(), map.creator.end());
+                    ImGui::Text("%s", creator.c_str());
 
-                ImGui::TableSetColumnIndex(3);
-                ImGui::Text("%s", map.status.c_str());
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%s", map.status.c_str());
 
-                ImGui::TableSetColumnIndex(4);
-                if (ImGui::Button("Download")) {
-                    DownloadBeatmap(map.id, false); // false = isSetId
+                    ImGui::TableSetColumnIndex(4);
+                    std::wstring mapId = std::wstring(map.id.begin(), map.id.end());
+                    bool isDownloaded = HistoryManager::Instance().IsMapDownloaded(mapId);
+
+                    if (isDownloaded) {
+                        ImGui::BeginDisabled();
+                        ImGui::Button("Downloaded", ImVec2(-1, 0));
+                        ImGui::EndDisabled();
+                    } else {
+                        if (ImGui::Button("Download", ImVec2(-1, 0))) {
+                            std::wstring artist = map.artist;
+                            std::wstring title = map.title;
+                            std::thread([mapId, artist, title]() {
+                                DownloadBeatmap(mapId, false, artist, title);
+                            }).detach();
+                        }
+                    }
+                    ImGui::PopID();
                 }
-                ImGui::PopID();
+                ImGui::EndTable();
             }
-            ImGui::EndTable();
         }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
     }
 };

@@ -21,6 +21,7 @@ public:
     void AddEntry(const HistoryEntry& entry);
     const std::vector<HistoryEntry>& GetEntries() const;
     void Clear();
+    bool IsMapDownloaded(const std::wstring& id);
 
 private:
     HistoryManager() = default;
@@ -30,5 +31,4 @@ private:
 
     std::vector<HistoryEntry> entries;
     mutable std::mutex mutex;
-    const size_t MAX_ENTRIES = 5;
 };

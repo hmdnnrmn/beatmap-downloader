@@ -124,6 +124,7 @@
     <ClCompile Include="providers\Resolver.cpp" />
     <ClCompile Include="features\speedtest_manager.cpp" />
     <ClCompile Include="features\HistoryManager.cpp" />
+    <ClCompile Include="overlay\StyleManager.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -139,6 +140,7 @@
     <ClInclude Include="overlay\tabs\TabManager.h" />
     <ClInclude Include="overlay\tabs\TabRegistry.h" />
     <ClInclude Include="overlay\tabs\OverlayTab.h" />
+    <ClInclude Include="overlay\StyleManager.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -97,16 +97,30 @@ void OverlayManager::Render() {
     // Non-blocking Download Popup
     DownloadState state = GetDownloadState();
     if (state.isDownloading) {
-        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 320, ImGui::GetIO().DisplaySize.y - 80), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(300, 60), ImGuiCond_Always);
+        std::string filenameStr(state.filename.begin(), state.filename.end());
+        std::string text = "Downloading: " + filenameStr;
+        
+        // Calculate dimensions
+        float maxWidth = 500.0f;
+        float paddingX = 40.0f;
+        float paddingY = 45.0f; // Space for progress bar and padding
+
+        ImVec2 textSize = ImGui::CalcTextSize(text.c_str(), nullptr, false, maxWidth - paddingX);
+        
+        float windowWidth = (std::max)(300.0f, textSize.x + paddingX);
+        float windowHeight = (std::max)(60.0f, textSize.y + paddingY);
+
+        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - windowWidth - 20, ImGui::GetIO().DisplaySize.y - windowHeight - 20), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.6f);
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | 
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | 
                                  ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing;
         
         if (ImGui::Begin("DownloadPopup", nullptr, flags)) {
-            std::string filenameStr(state.filename.begin(), state.filename.end());
-            ImGui::Text("Downloading: %s", filenameStr.c_str());
+            ImGui::PushTextWrapPos(ImGui::GetWindowWidth() - 20.0f);
+            ImGui::Text("%s", text.c_str());
+            ImGui::PopTextWrapPos();
             ImGui::ProgressBar(state.progress / 100.0f, ImVec2(-1, 0));
         }
         ImGui::End();

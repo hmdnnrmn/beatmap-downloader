@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+#include <shlobj.h>
 
 namespace fs = std::filesystem;
 
@@ -81,7 +82,26 @@ void SpeedtestManager::RunNextTest() {
     std::string url = provider->GetDownloadUrl(beatmapSetId, false);
     
     // Prepare destination
-    std::wstring songsPath = ConfigManager::Instance().GetSongsPath();
+    wchar_t localAppData[MAX_PATH];
+    std::wstring songsPath;
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+        songsPath = std::wstring(localAppData) + L"\\osu!\\Downloads";
+    } else {
+        // If we can't get the path, we can't download.
+        // Log error or just return (since this is void, maybe just return or set status)
+        {
+             std::lock_guard<std::mutex> lock(m_Mutex);
+             m_Results[currentIndex].status = "Failed (Path)";
+             m_CurrentProviderIndex++;
+        }
+        RunNextTest();
+        return;
+    }
+    
+    // Ensure directory exists
+    if (!fs::exists(songsPath)) {
+        fs::create_directories(songsPath);
+    }
     std::wstring tempFilename = L"speedtest_" + std::to_wstring(currentIndex) + L".osz";
     std::wstring fullPath = songsPath + L"\\" + tempFilename;
 

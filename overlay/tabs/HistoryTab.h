@@ -10,7 +10,7 @@ public:
     std::string GetName() const override { return "History"; }
 
     void Render() override {
-        ImGui::Text("Recent Downloads (Max 5)");
+        ImGui::Text("Recent Downloads");
         if (ImGui::Button("Clear History")) {
             HistoryManager::Instance().Clear();
         }

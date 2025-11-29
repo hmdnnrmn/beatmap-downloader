@@ -117,6 +117,7 @@
     <ClCompile Include="overlay\imgui\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="providers\Catboy.cpp" />
     <ClCompile Include="providers\Nerinyan.cpp" />
+    <ClCompile Include="providers\Nekoha.cpp" />
     <ClCompile Include="providers\ProviderRegistry.cpp" />
     <ClCompile Include="providers\Sayobot.cpp" />
     <ClCompile Include="providers\OsuDirect.cpp" />
@@ -125,6 +126,8 @@
     <ClCompile Include="features\speedtest_manager.cpp" />
     <ClCompile Include="features\HistoryManager.cpp" />
     <ClCompile Include="overlay\StyleManager.cpp" />
+    <ClCompile Include="features\database\database.cpp" />
+    <ClCompile Include="utils\BinaryReader.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -133,6 +136,7 @@
     <ClInclude Include="features\download_manager.h" />
     <ClInclude Include="providers\Beatconnect.h" />
     <ClInclude Include="providers\Resolver.h" />
+    <ClInclude Include="providers\Nekoha.h" />
     <ClInclude Include="features\speedtest_manager.h" />
     <ClInclude Include="features\HistoryManager.h" />
     <ClInclude Include="overlay\tabs\HistoryTab.h" />
@@ -141,6 +145,9 @@
     <ClInclude Include="overlay\tabs\TabRegistry.h" />
     <ClInclude Include="overlay\tabs\OverlayTab.h" />
     <ClInclude Include="overlay\StyleManager.h" />
+    <ClInclude Include="features\database\database.h" />
+    <ClInclude Include="features\database\database_structure.h" />
+    <ClInclude Include="utils\BinaryReader.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

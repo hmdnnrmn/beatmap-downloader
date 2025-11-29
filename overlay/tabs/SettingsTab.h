@@ -11,7 +11,6 @@ public:
     std::string GetName() const override { return "Settings"; }
 
     void Render() override {
-        static char songsPath[256] = "";
         static int mirrorIndex = 0;
         static int metadataMirrorIndex = 0;
         static bool autoOpen = false;
@@ -19,10 +18,6 @@ public:
         static bool initSettings = false;
 
         if (!initSettings) {
-            std::wstring wPath = ConfigManager::Instance().GetSongsPath();
-            std::string sPath(wPath.begin(), wPath.end());
-            strcpy_s(songsPath, sPath.c_str());
-            
             mirrorIndex = ConfigManager::Instance().GetDownloadMirrorIndex();
             metadataMirrorIndex = ConfigManager::Instance().GetMetadataMirrorIndex();
             autoOpen = ConfigManager::Instance().GetAutoOpen();
@@ -30,12 +25,6 @@ public:
             initSettings = true;
         }
 
-        if (ImGui::InputText("Songs Path", songsPath, IM_ARRAYSIZE(songsPath))) {
-            std::string sPath = songsPath;
-            std::wstring wPath(sPath.begin(), sPath.end());
-            ConfigManager::Instance().SetSongsPath(wPath);
-        }
-        
         std::vector<std::string> providerNames = ProviderRegistry::Instance().GetProviderNames();
         std::vector<const char*> mirrors;
         for (const auto& name : providerNames) {

@@ -13,12 +13,14 @@
 #include "providers/ProviderRegistry.h"
 #include "providers/Resolver.h"
 #include "HistoryManager.h"
+#include "features/database/database.h"
 
 namespace fs = std::filesystem;
 
 // Global state
 static DownloadState g_DownloadState;
 static std::mutex g_StateMutex;
+static OsuDatabase g_OsuDb;
 
 DownloadState GetDownloadState() {
     std::lock_guard<std::mutex> lock(g_StateMutex);
@@ -37,6 +39,23 @@ static void UpdateDownloadState(const std::wstring& id, const std::wstring& name
 
 bool InitializeDownloadManager() {
     network::HttpRequest::GlobalInit();
+    
+    // Dynamic osu! root path
+    wchar_t localAppData[MAX_PATH];
+    std::string osuRoot;
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+        std::wstring ws(localAppData);
+        std::string s(ws.begin(), ws.end());
+        osuRoot = s + "\\osu!";
+    } else {
+        LogError("Failed to get LocalAppData path.");
+        return false;
+    }
+    
+    std::string dbPath = osuRoot + "\\osu!.db";
+    
+    g_OsuDb.Load(dbPath);
+
     LogInfo("Download manager initialized (Network Layer Refactored)");
     return true;
 }
@@ -47,47 +66,38 @@ void CleanupDownloadManager() {
 }
 
 bool CheckIfMapExists(const std::wstring& beatmapId) {
-    std::wstring songsPath = ConfigManager::Instance().GetSongsPath();
-    
-    // 1. Check for .osz file
-    std::wstring oszPath = songsPath + L"\\" + beatmapId + L".osz";
-    if (GetFileAttributesW(oszPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        LogInfo("Beatmap .osz already exists: " + std::string(beatmapId.begin(), beatmapId.end()));
-        return true;
-    }
-
-    // 2. Check for imported folder (starts with ID followed by space)
     try {
-        if (fs::exists(songsPath)) {
-            for (const auto& entry : fs::directory_iterator(songsPath)) {
-                if (entry.is_directory()) {
-                    std::wstring dirName = entry.path().filename().wstring();
-                    if (dirName.find(beatmapId + L" ") == 0) {
-                        LogInfo("Beatmap already imported: " + std::string(dirName.begin(), dirName.end()));
-                        return true;
-                    }
-                }
-            }
+        int setId = std::stoi(beatmapId);
+        if (g_OsuDb.GetSetIds().count(setId)) {
+            LogInfo("Beatmap Set already exists in database: " + std::to_string(setId));
+            return true;
         }
-    } catch (const std::exception& e) {
-        LogError("Error scanning Songs directory: " + std::string(e.what()));
+    } catch (...) {
+        // Not a valid integer ID, ignore
     }
-
     return false;
 }
 
 bool TryDownloadFromUrl(const std::string& downloadUrl, const std::wstring& filename, const std::wstring& beatmapId, const std::wstring& title) {
-    std::wstring songsPath = ConfigManager::Instance().GetSongsPath();
+    // Dynamic download path
+    wchar_t localAppData[MAX_PATH];
+    std::wstring songsPath;
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+        songsPath = std::wstring(localAppData) + L"\\osu!\\Downloads";
+    } else {
+        LogError("Failed to get LocalAppData path for download.");
+        return false;
+    }
     std::wstring fullPath = songsPath + L"\\" + filename;
 
     LogDebug("Target path: " + std::string(fullPath.begin(), fullPath.end()));
 
-    // Ensure Songs directory exists
+    // Ensure Downloads directory exists
     if (GetFileAttributesW(songsPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
         if (!CreateDirectoryW(songsPath.c_str(), NULL)) {
-             LogError("Songs directory does not exist and could not be created.");
-             UpdateDownloadState(beatmapId, L"Error: No Songs Dir", 0, 0, 0, false);
-             HistoryManager::Instance().AddEntry({title, beatmapId, "Failed (No Songs Dir)", std::time(nullptr)});
+             LogError("Downloads directory does not exist and could not be created.");
+             UpdateDownloadState(beatmapId, L"Error: No Downloads Dir", 0, 0, 0, false);
+             HistoryManager::Instance().AddEntry({title, beatmapId, "Failed (No Downloads Dir)", std::time(nullptr)});
              return false;
         }
     }
